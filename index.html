@@ -84,7 +84,7 @@ body{height:100%;margin:0;padding:0;font-family:var(--font);color:var(--black);d
 .b-overdue{background:var(--red-light);color:var(--red-text)}
 .b-upcoming{background:var(--amber-light);color:var(--amber-text)}
 .b-unpaid{background:#EFEFEF;color:#555}
-.b-free{background:#E8F5E9;color:#1A7A3A}
+.b-free{background:#E3F0FF;color:#0055AA}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:13px 13px 0}
 .sc{background:#fff;border-radius:12px;border:.5px solid var(--gray-mid);padding:13px}
 .sc-ic{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;margin-bottom:8px}
@@ -269,6 +269,7 @@ body{height:100%;margin:0;padding:0;font-family:var(--font);color:var(--black);d
         <div class="sc"><div class="sc-ic" style="background:var(--green-light)"><i class="ti ti-currency-dollar" style="color:var(--green)"></i></div><div class="sc-v" style="color:var(--green)" id="d-rev">—</div><div class="sc-l">Revenue</div></div>
         <div class="sc"><div class="sc-ic" style="background:var(--red-light)"><i class="ti ti-alert-circle" style="color:var(--red)"></i></div><div class="sc-v" style="color:var(--red)" id="d-unp">—</div><div class="sc-l">Unpaid</div></div>
         <div class="sc"><div class="sc-ic" style="background:var(--amber-light)"><i class="ti ti-check" style="color:var(--amber)"></i></div><div class="sc-v" style="color:var(--amber)" id="d-paid">—</div><div class="sc-l">Paid count</div></div>
+        <div class="sc" style="grid-column:span 2"><div class="sc-ic" style="background:#E3F0FF"><i class="ti ti-gift" style="color:#0055AA"></i></div><div class="sc-v" style="color:#0055AA" id="d-free">—</div><div class="sc-l">Free players (no fee)</div></div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:13px" id="bcards"></div>
       <div style="padding:0 13px 13px"><div class="slbl">Recent activity</div><div id="actfeed"><div class="empty"><i class="ti ti-clock"></i><p>No activity yet</p></div></div></div>
@@ -349,7 +350,7 @@ body{height:100%;margin:0;padding:0;font-family:var(--font);color:var(--black);d
         <div class="pill on" onclick="filtN('all',this)">All</div>
         <div class="pill" onclick="filtN('crit',this)">Expired</div>
         <div class="pill" onclick="filtN('warn',this)">3 days</div>
-        <div class="pill" onclick="filtN('upco',this)">5 days</div>
+        <div class="pill" onclick="filtN('upco',this)">7 days</div>
       </div>
       <div id="nlist" style="padding:9px 13px 80px"></div>
     </div>
@@ -650,10 +651,13 @@ function renderDash(){
   const paid=ps.filter(p=>p.status==='paid');const ov=ps.filter(p=>p.status==='overdue');
   const rev=paid.reduce((s,p)=>s+(p.fee||750),0);
   const unp=ps.filter(p=>p.status!=='paid'&&!p.isFree).reduce((s,p)=>s+(p.fee||750),0);
+  const freePlayers=ps.filter(p=>p.isFree||p.status==='free');
   document.getElementById('d-tot').textContent=ps.length;
   document.getElementById('d-rev').textContent='ETB '+fmtN(rev);
   document.getElementById('d-unp').textContent='ETB '+fmtN(unp);
   document.getElementById('d-paid').textContent=paid.length;
+  const freeEl=document.getElementById('d-free');
+  if(freeEl)freeEl.textContent=freePlayers.length;
   const oa=document.getElementById('ov-alert');
   if(ov.length>0){oa.style.display='flex';document.getElementById('ov-txt').textContent=ov.length+' players overdue — action needed';}
   else oa.style.display='none';
@@ -670,6 +674,7 @@ function renderDash(){
       <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray-text);margin-bottom:2px"><span>Players</span><span style="font-weight:500;color:var(--black)">${bp.length}</span></div>
       <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray-text);margin-bottom:2px"><span>Paid</span><span style="font-weight:500;color:var(--black)">${bpaid.length}</span></div>
       <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray-text)"><span>Revenue</span><span style="font-weight:500;color:var(--black)">ETB ${fmtN(brev)}</span></div>
+      ${bp.filter(p=>p.isFree||p.status==='free').length>0?`<div style="display:flex;justify-content:space-between;font-size:11px;color:#0055AA;margin-top:2px"><span>Free players</span><span style="font-weight:500">${bp.filter(p=>p.isFree||p.status==='free').length}</span></div>`:''}
       <div style="background:var(--gray);height:4px;border-radius:3px;margin-top:8px;overflow:hidden"><div style="height:100%;border-radius:3px;background:${c.dot};width:${pct}%"></div></div>
     </div>`;
   }).join('');
@@ -728,13 +733,14 @@ function renderPlayers(){
   c.innerHTML=list.map(p=>{
     const col=bc(p.branch);const full=(p.fname||'')+' '+(p.lname||'');const num=pNum[p.id]||1;
     const isFree=p.isFree||p.status==='free';
-    const avH=p.photo?`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover">`:`<div style="width:100%;height:100%;background:${col.av};color:${col.avt};display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px">${ini(full)}</div>`;
-    return`<div class="pc" onclick="openPD('${p.id}')">
+    const avH=p.photo?`<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover">`:`<div style="width:100%;height:100%;background:${isFree?'#E3F0FF':col.av};color:${isFree?'#0055AA':col.avt};display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px">${ini(full)}</div>`;
+    return`<div class="pc" onclick="openPD('${p.id}')" style="border-left:${isFree?'3px solid #0055AA':'none'}">
       <div style="font-size:10px;font-weight:700;color:var(--gray-text);min-width:25px;flex-shrink:0">#${num}</div>
       <div class="av av46">${avH}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:500">${full}</div>
         <div style="font-size:10px;color:var(--gray-text);margin-top:2px">Age ${p.age||'—'} · ${p.branch||'—'} · ${isFree?'Free':'ETB '+(p.fee||750)+'/mo'}${p.jersey?' · #'+p.jersey:''}</div>
+        ${p.trainingDays&&p.trainingDays.length?`<div style="font-size:10px;color:#0055AA;margin-top:3px;display:flex;gap:3px;flex-wrap:wrap">${p.trainingDays.map(d=>`<span style="background:#E3F0FF;border-radius:4px;padding:1px 5px;font-size:9px;font-weight:500">${d}</span>`).join('')}</div>`:''}
       </div>
       <span class="bdg ${isFree?'b-free':(bcl[p.status]||'b-unpaid')}">${isFree?'Free':(btx[p.status]||'Unpaid')}</span>
     </div>`;
@@ -1115,23 +1121,44 @@ function expXLS(data){
 // ── NOTIFICATIONS ─────────────────────────────
 function reqNotifPerm(){if('Notification'in window&&Notification.permission==='default')Notification.requestPermission();}
 function calcNotifs(){
-  const ps=window._ps||[];const today=new Date();today.setHours(0,0,0,0);
+  const ps=window._ps||[];
+  const today=new Date();today.setHours(0,0,0,0);
   const dDay=parseInt(localStorage.getItem('ifa_dueday')||'1');
   const notifs=[];
   ps.forEach(p=>{
-    if(p.status==='paid'||p.isFree||p.status==='free')return;
+    if(p.isFree||p.status==='free'||p.status==='paid')return;
     const full=(p.fname||'')+' '+(p.lname||'');
-    const due=new Date(today.getFullYear(),today.getMonth(),dDay);if(due<today)due.setMonth(due.getMonth()+1);
+    const isFeePlayer=!p.isFree&&p.status!=='free';
+    // Calculate next due date
+    let due=new Date(today.getFullYear(),today.getMonth(),dDay);
+    // If due date already passed this month, check if it's overdue
     const diff=Math.ceil((due-today)/864e5);
-    if(p.status==='overdue'||diff<0)notifs.push({type:'crit',player:p,title:full+' — OVERDUE',desc:p.branch+' · ETB '+(p.fee||750),days:diff,id:p.id});
-    else if(diff<=3)notifs.push({type:'warn',player:p,title:full+' — Due in '+diff+' day'+(diff===1?'':'s'),desc:p.branch+' · ETB '+(p.fee||750),days:diff,id:p.id});
-    else if(diff<=5)notifs.push({type:'upco',player:p,title:full+' — Due in '+diff+' days',desc:p.branch+' · ETB '+(p.fee||750),days:diff,id:p.id});
+    if(p.status==='overdue'){
+      // Already marked overdue
+      const daysOver=diff<0?Math.abs(diff):0;
+      notifs.push({type:'crit',player:p,title:full+' — OVERDUE '+daysOver+'d',desc:p.branch+' · ETB '+(p.fee||750),days:diff,id:p.id});
+    } else if(diff<0){
+      // Due date passed, not marked paid
+      notifs.push({type:'crit',player:p,title:full+' — OVERDUE',desc:p.branch+' · '+Math.abs(diff)+' days past due',days:diff,id:p.id});
+    } else if(diff===0){
+      notifs.push({type:'crit',player:p,title:full+' — Due TODAY',desc:p.branch+' · ETB '+(p.fee||750),days:0,id:p.id});
+    } else if(diff<=3){
+      notifs.push({type:'warn',player:p,title:full+' — Due in '+diff+' day'+(diff===1?'':'s'),desc:p.branch+' · ETB '+(p.fee||750),days:diff,id:p.id});
+    } else if(diff<=7){
+      notifs.push({type:'upco',player:p,title:full+' — Due in '+diff+' days',desc:p.branch+' · ETB '+(p.fee||750),days:diff,id:p.id});
+    }
   });
-  notifs.sort((a,b)=>a.type==='crit'&&b.type!=='crit'?-1:b.type==='crit'&&a.type!=='crit'?1:a.days-b.days);
+  notifs.sort((a,b)=>{
+    const order={crit:0,warn:1,upco:2};
+    return (order[a.type]||3)-(order[b.type]||3)||a.days-b.days;
+  });
   allNotifs=notifs;
   const cnt=notifs.filter(n=>n.type==='crit'||n.type==='warn').length;
   const badge=document.getElementById('nbb');
-  if(badge){if(cnt>0){badge.style.display='flex';badge.textContent=cnt>9?'9+':cnt;}else badge.style.display='none';}
+  if(badge){
+    if(cnt>0){badge.style.display='flex';badge.textContent=cnt>9?'9+':String(cnt);}
+    else badge.style.display='none';
+  }
   if(curScr==='notifs')renderNotifs();
 }
 function filtN(t,el){notifFilt=t;document.querySelectorAll('#scr-notifs .pills .pill').forEach(p=>p.classList.remove('on'));if(el)el.classList.add('on');renderNotifs();}
@@ -1140,7 +1167,7 @@ function renderNotifs(){
   let f=allNotifs;
   if(notifFilt==='crit')f=allNotifs.filter(n=>n.type==='crit');
   else if(notifFilt==='warn')f=allNotifs.filter(n=>n.type==='warn');
-  else if(notifFilt==='upco')f=allNotifs.filter(n=>n.type==='upco');
+  else if(notifFilt==='upco')f=allNotifs.filter(n=>n.type==='upco'); // 7 days
   if(sub)sub.textContent=f.length+' alert'+(f.length===1?'':'s');
   if(!f.length){list.innerHTML='<div class="empty"><i class="ti ti-check" style="color:var(--green)"></i><p>No alerts right now</p></div>';return;}
   const ci={'crit':'var(--red-light)','warn':'var(--amber-light)','upco':'#E8F5E9'};
