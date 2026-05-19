@@ -645,7 +645,28 @@ function goScr(name,el){
   if(name==='notifs')renderNotifs();
   if(name==='admin'){renderAdmin();renderBranchMgmt();}
 }
-function renderAll(){renderDash();renderPlayers();renderPay();renderAtt();calcNotifs();if(window._role==='admin')renderAdmin();}
+function renderAll(){
+  autoUpdateStatuses();
+  renderDash();renderPlayers();renderPay();renderAtt();calcNotifs();
+  if(window._role==='admin')renderAdmin();
+}
+
+async function autoUpdateStatuses(){
+  const ps=window._ps||[];
+  const today=new Date();today.setHours(0,0,0,0);
+  for(const p of ps){
+    if(p.isFree||p.status==='free'||p.status==='paid')continue;
+    const due=getNextPayDate(p);
+    const diff=Math.ceil((due-today)/864e5);
+    let newStatus=p.status;
+    if(diff<0)newStatus='overdue';
+    else if(diff<=5)newStatus='upcoming';
+    else if(p.status==='overdue'||p.status==='upcoming')newStatus='unpaid';
+    if(newStatus!==p.status){
+      try{await window._updP(p.id,{status:newStatus});}catch(e){}
+    }
+  }
+}
 
 // ── DASHBOARD ────────────────────────────────
 function renderDash(){
@@ -762,7 +783,13 @@ function payCard(p){
   if(due<today)due.setMonth(due.getMonth()+1);
   const diff=Math.ceil((due-today)/864e5);
   let bg,ic,tit,sub,col,bdr;
-  if(p.status==='paid'){bg='#E8F5E9';ic='ti-circle-check';tit='Payment confirmed';sub='Paid for this period';col='#1A7A3A';bdr='#C8E6C9';}
+  if(p.status==='paid'){
+    const due2=getNextPayDate(p);const today2=new Date();today2.setHours(0,0,0,0);
+    const diff2=Math.ceil((due2-today2)/864e5);
+    bg='#E8F5E9';ic='ti-circle-check';tit='Payment confirmed';
+    sub='Next payment in '+diff2+' day'+(diff2===1?'':'s')+' ('+due2.toLocaleDateString('en-GB')+')';
+    col='#1A7A3A';bdr='#C8E6C9';
+  }
   else if(p.status==='overdue'||diff<=0){const d=Math.abs(diff)+1;bg='#FCE8E8';ic='ti-alert-circle';tit='Payment OVERDUE';sub=d+' day'+(d===1?'':'s')+' past due date';col='#CC0000';bdr='#F5C6CB';}
   else if(diff<=3){bg='#FFF3E0';ic='ti-clock';tit='Due in '+diff+' day'+(diff===1?'':'s');sub='Payment due very soon';col='#E65100';bdr='#FFE0B2';}
   else if(diff<=7){bg='#FFF8E1';ic='ti-calendar';tit='Due in '+diff+' days';sub='Upcoming payment';col='#F57F17';bdr='#FFECB3';}
@@ -1050,18 +1077,38 @@ function chgPM(d){payMonth+=d;if(payMonth>11){payMonth=0;payYear++;}if(payMonth<
 function updateAttLbl(){const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];document.getElementById('attdl').textContent=days[attDay.getDay()]+', '+attDay.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});}
 function chgDay(d){attDay=new Date(attDay.getTime()+d*864e5);updateAttLbl();renderAtt();}
 
+function getNextPayDate(p){
+  // Get the day-of-month from registration date as anchor
+  const today=new Date();today.setHours(0,0,0,0);
+  let anchorDay=1;
+  if(p.regdate){
+    const rd=new Date(p.regdate);
+    if(!isNaN(rd))anchorDay=rd.getDate();
+  }
+  // Find next payment date = same day this month or next month
+  let due=new Date(today.getFullYear(),today.getMonth(),anchorDay);
+  if(due<=today)due.setMonth(due.getMonth()+1);
+  return due;
+}
+
 function getDaysLabel(p){
   if(p.isFree||p.status==='free')return null;
-  if(p.status==='paid')return{txt:'Paid',col:'#1A7A3A',bg:'#E8F5E9'};
   const today=new Date();today.setHours(0,0,0,0);
-  const dDay=parseInt(localStorage.getItem('ifa_dueday')||'1');
-  let due=new Date(today.getFullYear(),today.getMonth(),dDay);
-  if(due<today)due.setMonth(due.getMonth()+1);
+  const due=getNextPayDate(p);
   const diff=Math.ceil((due-today)/864e5);
-  if(diff<0||p.status==='overdue'){
-    const d=Math.abs(diff)+(diff<0?1:0);
-    return{txt:d+'d overdue',col:'#CC0000',bg:'#FCE8E8'};
+  if(p.status==='paid'){
+    // Still show countdown to next payment even if paid
+    if(diff<=5)return{txt:'Next in '+diff+'d',col:'#1A7A3A',bg:'#E8F5E9'};
+    return{txt:'Paid · '+diff+'d left',col:'#1A7A3A',bg:'#E8F5E9'};
   }
+  if(p.status==='overdue'){
+    // How many days past due
+    let pastDue=new Date(today.getFullYear(),today.getMonth(),getNextPayDate(p).getDate());
+    pastDue.setMonth(pastDue.getMonth()-1);
+    const daysOver=Math.ceil((today-pastDue)/864e5);
+    return{txt:daysOver+'d overdue',col:'#CC0000',bg:'#FCE8E8'};
+  }
+  if(diff<0)return{txt:Math.abs(diff)+'d overdue',col:'#CC0000',bg:'#FCE8E8'};
   if(diff===0)return{txt:'Due today!',col:'#CC0000',bg:'#FCE8E8'};
   if(diff<=3)return{txt:diff+'d left',col:'#E65100',bg:'#FFF3E0'};
   if(diff<=7)return{txt:diff+'d left',col:'#F57F17',bg:'#FFF8E1'};
@@ -1080,7 +1127,12 @@ function drawAtt(){
   const ps=(window._ps||[]).filter(p=>{
     const b=p.branch||'';
     const bm=attFilt==='All'||b===attFilt||b.replace(' Branch','')===attFilt;
-    const nm=attSearch===''||((p.fname||'')+' '+(p.lname||'')).toLowerCase().includes(attSearch.toLowerCase());
+    const q=attSearch.toLowerCase().trim();
+    const full=((p.fname||'')+' '+(p.lname||'')).toLowerCase();
+    const fname=(p.fname||'').toLowerCase();
+    const lname=(p.lname||'').toLowerCase();
+    // Match start of full name, first name, or last name
+    const nm=q===''||full.startsWith(q)||fname.startsWith(q)||lname.startsWith(q);
     return bm&&nm;
   });
   let pres=0,abs=0,unk=0;
