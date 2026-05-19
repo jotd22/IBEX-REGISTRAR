@@ -304,6 +304,7 @@ body{height:100%;margin:0;padding:0;font-family:var(--font);color:var(--black);d
         <div class="sc"><div style="width:7px;height:7px;border-radius:50%;background:var(--red);margin-bottom:7px"></div><div class="sc-v" style="color:var(--red)" id="pm-ov">—</div><div class="sc-l">Overdue</div></div>
         <div class="sc"><div style="width:7px;height:7px;border-radius:50%;background:#D4A000;margin-bottom:7px"></div><div class="sc-v" style="color:#D4A000" id="pm-up">—</div><div class="sc-l">Upcoming</div></div>
         <div class="sc"><div style="width:7px;height:7px;border-radius:50%;background:#999;margin-bottom:7px"></div><div class="sc-v" style="color:#888" id="pm-unp">—</div><div class="sc-l">Unpaid</div></div>
+        <div class="sc" style="grid-column:span 2"><div style="width:7px;height:7px;border-radius:50%;background:#0055AA;margin-bottom:7px"></div><div class="sc-v" style="color:#0055AA" id="pm-free">—</div><div class="sc-l">Free players (training, no fee)</div></div>
       </div>
       <div style="padding:13px 13px 0">
         <div class="slbl">Overdue</div><div class="card" style="margin-bottom:11px"><div id="povl"></div></div>
@@ -318,6 +319,7 @@ body{height:100%;margin:0;padding:0;font-family:var(--font);color:var(--black);d
         <div class="att-sc"><div class="att-sn" style="color:var(--red)" id="ata">0</div><div class="att-sl">Absent</div></div>
         <div class="att-sc"><div class="att-sn" style="color:var(--gray-text)" id="atu">0</div><div class="att-sl">Unmarked</div></div>
       </div>
+      <div class="sw" style="padding-bottom:4px"><div class="sb"><i class="ti ti-search"></i><input type="text" placeholder="Search player in attendance…" oninput="filtAttSearch(this.value)" id="attsrch"></div></div>
       <div class="pills" id="abpills">
         <div class="pill on" onclick="filtAB('All',this)">All</div>
         <div class="pill" onclick="filtAB('CMC 1',this)">CMC 1</div>
@@ -577,7 +579,7 @@ window.addEventListener('online',()=>{document.getElementById('offb').style.disp
 window._ps=[];window._acts=[];window._role='admin';window._user=null;window._selRole='admin';
 let curScr='dash',bFilt='All',sFilt='All',pSearch='',abFilt='All';
 let payMonth=4,payYear=2026;
-let attDay=new Date(2026,4,12),attCache={};
+let attDay=new Date(2026,4,12),attCache={},attSearch='';
 let editID=null,recID=null,recDone=false,recImgData=null;
 let addPD=null,editPD=null,editPDkeep=null;
 let cropCB=null,cropImg=null,cropRot=0,cropZoom=1,cropOff={x:0,y:0},cropDrag=null;
@@ -741,6 +743,7 @@ function renderPlayers(){
         <div style="font-size:13px;font-weight:500">${full}</div>
         <div style="font-size:10px;color:var(--gray-text);margin-top:2px">Age ${p.age||'—'} · ${p.branch||'—'} · ${isFree?'Free':'ETB '+(p.fee||750)+'/mo'}${p.jersey?' · #'+p.jersey:''}</div>
         ${p.trainingDays&&p.trainingDays.length?`<div style="font-size:10px;color:#0055AA;margin-top:3px;display:flex;gap:3px;flex-wrap:wrap">${p.trainingDays.map(d=>`<span style="background:#E3F0FF;border-radius:4px;padding:1px 5px;font-size:9px;font-weight:500">${d}</span>`).join('')}</div>`:''}
+        ${(()=>{const dl=getDaysLabel(p);return dl&&!isFree?`<div style="margin-top:3px"><span style="background:${dl.bg};color:${dl.col};border-radius:4px;padding:2px 6px;font-size:9px;font-weight:600">${dl.txt}</span></div>`:'';})()}
       </div>
       <span class="bdg ${isFree?'b-free':(bcl[p.status]||'b-unpaid')}">${isFree?'Free':(btx[p.status]||'Unpaid')}</span>
     </div>`;
@@ -1025,8 +1028,10 @@ function renderPay(){
   const ps=window._ps||[];
   const paid=ps.filter(p=>p.status==='paid');const ov=ps.filter(p=>p.status==='overdue');
   const up=ps.filter(p=>p.status==='upcoming');const unp=ps.filter(p=>p.status==='unpaid');
+  const freeP=ps.filter(p=>p.isFree||p.status==='free');
   document.getElementById('pm-paid').textContent=paid.length;document.getElementById('pm-ov').textContent=ov.length;
   document.getElementById('pm-up').textContent=up.length;document.getElementById('pm-unp').textContent=unp.length;
+  const pmf=document.getElementById('pm-free');if(pmf)pmf.textContent=freeP.length;
   const rows=(list,col)=>{
     if(!list.length)return'<div style="padding:13px;text-align:center;font-size:13px;color:var(--gray-text)">None</div>';
     return list.slice(0,5).map(p=>{
@@ -1044,7 +1049,27 @@ function chgPM(d){payMonth+=d;if(payMonth>11){payMonth=0;payYear++;}if(payMonth<
 // ── ATTENDANCE ────────────────────────────────
 function updateAttLbl(){const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];document.getElementById('attdl').textContent=days[attDay.getDay()]+', '+attDay.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});}
 function chgDay(d){attDay=new Date(attDay.getTime()+d*864e5);updateAttLbl();renderAtt();}
+
+function getDaysLabel(p){
+  if(p.isFree||p.status==='free')return null;
+  if(p.status==='paid')return{txt:'Paid',col:'#1A7A3A',bg:'#E8F5E9'};
+  const today=new Date();today.setHours(0,0,0,0);
+  const dDay=parseInt(localStorage.getItem('ifa_dueday')||'1');
+  let due=new Date(today.getFullYear(),today.getMonth(),dDay);
+  if(due<today)due.setMonth(due.getMonth()+1);
+  const diff=Math.ceil((due-today)/864e5);
+  if(diff<0||p.status==='overdue'){
+    const d=Math.abs(diff)+(diff<0?1:0);
+    return{txt:d+'d overdue',col:'#CC0000',bg:'#FCE8E8'};
+  }
+  if(diff===0)return{txt:'Due today!',col:'#CC0000',bg:'#FCE8E8'};
+  if(diff<=3)return{txt:diff+'d left',col:'#E65100',bg:'#FFF3E0'};
+  if(diff<=7)return{txt:diff+'d left',col:'#F57F17',bg:'#FFF8E1'};
+  return{txt:diff+'d left',col:'#555',bg:'#F5F5F5'};
+}
+
 function filtAB(b,el){attFilt=b;document.querySelectorAll('#abpills .pill').forEach(p=>p.classList.remove('on'));if(el)el.classList.add('on');drawAtt();}
+function filtAttSearch(v){attSearch=v;drawAtt();}
 async function renderAtt(){
   const k=attDay.toISOString().split('T')[0];
   if(!attCache[k]){attCache[k]={};try{attCache[k]=await window._getAttDay(k);}catch(e){}}
@@ -1052,7 +1077,12 @@ async function renderAtt(){
 }
 function drawAtt(){
   const k=attDay.toISOString().split('T')[0];const ad=attCache[k]||{};
-  const ps=(window._ps||[]).filter(p=>{const b=p.branch||'';return attFilt==='All'||b===attFilt||b.replace(' Branch','')===attFilt;});
+  const ps=(window._ps||[]).filter(p=>{
+    const b=p.branch||'';
+    const bm=attFilt==='All'||b===attFilt||b.replace(' Branch','')===attFilt;
+    const nm=attSearch===''||((p.fname||'')+' '+(p.lname||'')).toLowerCase().includes(attSearch.toLowerCase());
+    return bm&&nm;
+  });
   let pres=0,abs=0,unk=0;
   ps.forEach(p=>{const s=ad[p.id]||'';if(s==='p')pres++;else if(s==='a')abs++;else unk++;});
   document.getElementById('atp').textContent=pres;document.getElementById('ata').textContent=abs;document.getElementById('atu').textContent=unk;
