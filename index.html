@@ -352,7 +352,7 @@ body{height:100%;margin:0;padding:0;font-family:var(--font);color:var(--black);d
         <div class="pill on" onclick="filtN('all',this)">All</div>
         <div class="pill" onclick="filtN('crit',this)">Expired</div>
         <div class="pill" onclick="filtN('warn',this)">3 days</div>
-        <div class="pill" onclick="filtN('upco',this)">7 days</div>
+        <div class="pill" onclick="filtN('upco',this)">5 days</div>
       </div>
       <div id="nlist" style="padding:9px 13px 80px"></div>
     </div>
@@ -579,7 +579,7 @@ window.addEventListener('online',()=>{document.getElementById('offb').style.disp
 window._ps=[];window._acts=[];window._role='admin';window._user=null;window._selRole='admin';
 let curScr='dash',bFilt='All',sFilt='All',pSearch='',abFilt='All';
 let payMonth=4,payYear=2026;
-let attDay=new Date(2026,4,12),attCache={},attSearch='';
+let attDay=new Date(),attCache={},attSearch=''; attDay.setHours(0,0,0,0);
 let editID=null,recID=null,recDone=false,recImgData=null;
 let addPD=null,editPD=null,editPDkeep=null;
 let cropCB=null,cropImg=null,cropRot=0,cropZoom=1,cropOff={x:0,y:0},cropDrag=null;
@@ -1094,25 +1094,36 @@ function getNextPayDate(p){
 function getDaysLabel(p){
   if(p.isFree||p.status==='free')return null;
   const today=new Date();today.setHours(0,0,0,0);
-  const due=getNextPayDate(p);
-  const diff=Math.ceil((due-today)/864e5);
+  // Get the last due date (this month anchor day)
+  let anchorDay=1;
+  if(p.regdate){const rd=new Date(p.regdate);if(!isNaN(rd))anchorDay=rd.getDate();}
+  // Last due date = this month's anchor day (may be in past)
+  let lastDue=new Date(today.getFullYear(),today.getMonth(),anchorDay);
+  // Next due date = same day next month if today is past anchor
+  let nextDue=new Date(lastDue);
+  if(lastDue>today){
+    // anchor is still in future this month, last due was last month
+    lastDue.setMonth(lastDue.getMonth()-1);
+  } else {
+    // anchor has passed, next due is next month
+    nextDue.setMonth(nextDue.getMonth()+1);
+  }
+  const daysUntilNext=Math.ceil((nextDue-today)/864e5);
+  const daysSinceLastDue=Math.ceil((today-lastDue)/864e5);
   if(p.status==='paid'){
-    // Still show countdown to next payment even if paid
-    if(diff<=5)return{txt:'Next in '+diff+'d',col:'#1A7A3A',bg:'#E8F5E9'};
-    return{txt:'Paid · '+diff+'d left',col:'#1A7A3A',bg:'#E8F5E9'};
+    if(daysUntilNext<=5)return{txt:'Next in '+daysUntilNext+'d',col:'#1A7A3A',bg:'#E8F5E9'};
+    return{txt:'Paid · '+daysUntilNext+'d left',col:'#1A7A3A',bg:'#E8F5E9'};
   }
-  if(p.status==='overdue'){
-    // How many days past due
-    let pastDue=new Date(today.getFullYear(),today.getMonth(),getNextPayDate(p).getDate());
-    pastDue.setMonth(pastDue.getMonth()-1);
-    const daysOver=Math.ceil((today-pastDue)/864e5);
-    return{txt:daysOver+'d overdue',col:'#CC0000',bg:'#FCE8E8'};
+  // Not paid — check if overdue
+  if(p.status==='overdue'||daysSinceLastDue>=0){
+    // payment day has passed and not paid = overdue
+    return{txt:daysSinceLastDue+'d overdue',col:'#CC0000',bg:'#FCE8E8'};
   }
-  if(diff<0)return{txt:Math.abs(diff)+'d overdue',col:'#CC0000',bg:'#FCE8E8'};
-  if(diff===0)return{txt:'Due today!',col:'#CC0000',bg:'#FCE8E8'};
-  if(diff<=3)return{txt:diff+'d left',col:'#E65100',bg:'#FFF3E0'};
-  if(diff<=7)return{txt:diff+'d left',col:'#F57F17',bg:'#FFF8E1'};
-  return{txt:diff+'d left',col:'#555',bg:'#F5F5F5'};
+  // Not yet due
+  if(daysUntilNext===0)return{txt:'Due today!',col:'#CC0000',bg:'#FCE8E8'};
+  if(daysUntilNext<=3)return{txt:daysUntilNext+'d left',col:'#E65100',bg:'#FFF3E0'};
+  if(daysUntilNext<=7)return{txt:daysUntilNext+'d left',col:'#F57F17',bg:'#FFF8E1'};
+  return{txt:daysUntilNext+'d left',col:'#555',bg:'#F5F5F5'};
 }
 
 function filtAB(b,el){attFilt=b;document.querySelectorAll('#abpills .pill').forEach(p=>p.classList.remove('on'));if(el)el.classList.add('on');drawAtt();}
@@ -1205,29 +1216,45 @@ function reqNotifPerm(){if('Notification'in window&&Notification.permission==='d
 function calcNotifs(){
   const ps=window._ps||[];
   const today=new Date();today.setHours(0,0,0,0);
-  const dDay=parseInt(localStorage.getItem('ifa_dueday')||'1');
   const notifs=[];
   ps.forEach(p=>{
     if(p.isFree||p.status==='free'||p.status==='paid')return;
     const full=(p.fname||'')+' '+(p.lname||'');
-    const isFeePlayer=!p.isFree&&p.status!=='free';
-    // Calculate next due date
-    let due=new Date(today.getFullYear(),today.getMonth(),dDay);
-    // If due date already passed this month, check if it's overdue
-    const diff=Math.ceil((due-today)/864e5);
-    if(p.status==='overdue'){
-      // Already marked overdue
-      const daysOver=diff<0?Math.abs(diff):0;
-      notifs.push({type:'crit',player:p,title:full+' — OVERDUE '+daysOver+'d',desc:p.branch+' · ETB '+(p.fee||750),days:diff,id:p.id});
-    } else if(diff<0){
-      // Due date passed, not marked paid
-      notifs.push({type:'crit',player:p,title:full+' — OVERDUE',desc:p.branch+' · '+Math.abs(diff)+' days past due',days:diff,id:p.id});
-    } else if(diff===0){
-      notifs.push({type:'crit',player:p,title:full+' — Due TODAY',desc:p.branch+' · ETB '+(p.fee||750),days:0,id:p.id});
-    } else if(diff<=3){
-      notifs.push({type:'warn',player:p,title:full+' — Due in '+diff+' day'+(diff===1?'':'s'),desc:p.branch+' · ETB '+(p.fee||750),days:diff,id:p.id});
-    } else if(diff<=7){
-      notifs.push({type:'upco',player:p,title:full+' — Due in '+diff+' days',desc:p.branch+' · ETB '+(p.fee||750),days:diff,id:p.id});
+    // Use regdate as anchor day
+    let anchorDay=1;
+    if(p.regdate){const rd=new Date(p.regdate);if(!isNaN(rd))anchorDay=rd.getDate();}
+    // This month's due date
+    let thisDue=new Date(today.getFullYear(),today.getMonth(),anchorDay);
+    // Next month's due date
+    let nextDue=new Date(thisDue);nextDue.setMonth(nextDue.getMonth()+1);
+    // Days until next due
+    const daysUntilNext=Math.ceil((nextDue-today)/864e5);
+    // Days since this month's due (if passed)
+    const daysSinceThisDue=Math.ceil((today-thisDue)/864e5);
+    if(daysSinceThisDue>=0){
+      // This month's payment day has passed and not paid = overdue
+      notifs.push({
+        type:'crit',player:p,
+        title:full+' — OVERDUE',
+        desc:p.branch+' · '+daysSinceThisDue+' day'+(daysSinceThisDue===1?'':'s')+' past due · ETB '+(p.fee||750),
+        days:-daysSinceThisDue,id:p.id
+      });
+    } else if(daysUntilNext<=3){
+      // Due in 1-3 days (warning)
+      notifs.push({
+        type:'warn',player:p,
+        title:full+' — Due in '+daysUntilNext+' day'+(daysUntilNext===1?'':'s'),
+        desc:p.branch+' · Due '+nextDue.toLocaleDateString('en-GB')+' · ETB '+(p.fee||750),
+        days:daysUntilNext,id:p.id
+      });
+    } else if(daysUntilNext<=5){
+      // Due in 4-5 days (upcoming warning)
+      notifs.push({
+        type:'upco',player:p,
+        title:full+' — Due in '+daysUntilNext+' days',
+        desc:p.branch+' · Due '+nextDue.toLocaleDateString('en-GB')+' · ETB '+(p.fee||750),
+        days:daysUntilNext,id:p.id
+      });
     }
   });
   notifs.sort((a,b)=>{
