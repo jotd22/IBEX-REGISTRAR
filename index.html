@@ -1,3 +1,8 @@
+bash
+
+cat /mnt/user-data/outputs/index.html
+Output
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -352,7 +357,7 @@ body{height:100%;margin:0;padding:0;font-family:var(--font);color:var(--black);d
         <div class="pill on" onclick="filtN('all',this)">All</div>
         <div class="pill" onclick="filtN('crit',this)">Expired</div>
         <div class="pill" onclick="filtN('warn',this)">3 days</div>
-        <div class="pill" onclick="filtN('upco',this)">5 days</div>
+        <div class="pill" onclick="filtN('upco',this)">7 days</div>
       </div>
       <div id="nlist" style="padding:9px 13px 80px"></div>
     </div>
@@ -661,7 +666,7 @@ async function autoUpdateStatuses(){
     let newStatus=p.status;
     if(diff<=0)newStatus='overdue';
     else if(diff<=7)newStatus='upcoming';
-    else if(p.status==='unpaid')newStatus='overdue'; // migrate legacy unpaid → overdue
+    // don't reset to unpaid - leave as is if more than 7 days away
     if(newStatus!==p.status){
       try{await window._updP(p.id,{status:newStatus});}catch(e){}
     }
@@ -1201,7 +1206,14 @@ function expXLS(data){
 }
 
 // ── NOTIFICATIONS ─────────────────────────────
-function reqNotifPerm(){if('Notification'in window&&Notification.permission==='default')Notification.requestPermission();}
+function reqNotifPerm(){
+  if(!('Notification' in window))return;
+  if(Notification.permission==='default'){
+    Notification.requestPermission().then(p=>{
+      if(p==='granted')toast('Notifications enabled ✓');
+    });
+  }
+}
 function calcNotifs(){
   const ps=window._ps||[];
   const today=new Date();today.setHours(0,0,0,0);
@@ -1229,15 +1241,15 @@ function calcNotifs(){
         days:-daysSinceThisDue,id:p.id
       });
     } else if(daysUntilNext<=3){
-      // Due in 1-3 days (warning)
+      // Due in 1-3 days - urgent warning
       notifs.push({
         type:'warn',player:p,
         title:full+' — Due in '+daysUntilNext+' day'+(daysUntilNext===1?'':'s'),
         desc:p.branch+' · Due '+nextDue.toLocaleDateString('en-GB')+' · ETB '+(p.fee||750),
         days:daysUntilNext,id:p.id
       });
-    } else if(daysUntilNext<=5){
-      // Due in 4-5 days (upcoming warning)
+    } else if(daysUntilNext<=7){
+      // Due in 4-7 days - upcoming
       notifs.push({
         type:'upco',player:p,
         title:full+' — Due in '+daysUntilNext+' days',
@@ -1258,6 +1270,8 @@ function calcNotifs(){
     else badge.style.display='none';
   }
   if(curScr==='notifs')renderNotifs();
+  // Send background notifications
+  sendPendingNotifs(allNotifs);
 }
 function filtN(t,el){notifFilt=t;document.querySelectorAll('#scr-notifs .pills .pill').forEach(p=>p.classList.remove('on'));if(el)el.classList.add('on');renderNotifs();}
 function renderNotifs(){
@@ -1351,8 +1365,131 @@ window.addEventListener('load',()=>{
 </script>
 
 <script>
-const swCode=`const CACHE='ifa-v3';self.addEventListener('install',e=>{self.skipWaiting();});self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;if(e.request.url.includes('firebase')||e.request.url.includes('gstatic'))return;e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(CACHE).then(ca=>ca.put(e.request,c));return r;}).catch(()=>caches.match(e.request)));});`;
-if('serviceWorker'in navigator){const b=new Blob([swCode],{type:'text/javascript'});navigator.serviceWorker.register(URL.createObjectURL(b)).catch(()=>{});}
+const swCode=`
+const CACHE='ifa-v4';
+self.addEventListener('install',e=>{self.skipWaiting();});
+self.addEventListener('activate',e=>{
+  e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+  self.clients.claim();
+});
+self.addEventListener('fetch',e=>{
+  if(e.request.method!=='GET')return;
+  if(e.request.url.includes('firebase')||e.request.url.includes('gstatic'))return;
+  e.respondWith(fetch(e.request).then(r=>{
+    const c=r.clone();
+    caches.open(CACHE).then(ca=>ca.put(e.request,c));
+    return r;
+  }).catch(()=>caches.match(e.request)));
+});
+self.addEventListener('push',e=>{
+  const data=e.data?e.data.json():{};
+  e.waitUntil(self.registration.showNotification(data.title||'IFA Alert',{
+    body:data.body||'Payment reminder',
+    icon:data.icon||'',
+    badge:data.badge||'',
+    tag:data.tag||'ifa-alert',
+    requireInteraction:true,
+    data:{url:data.url||'/'}
+  }));
+});
+self.addEventListener('notificationclick',e=>{
+  e.notification.close();
+  e.waitUntil(clients.matchAll({type:'window'}).then(cs=>{
+    for(const c of cs){if(c.url&&'focus'in c)return c.focus();}
+    if(clients.openWindow)return clients.openWindow('/');
+  }));
+});
+`;
+
+let _swReg=null;
+async function initSW(){
+  if(!('serviceWorker' in navigator))return;
+  try{
+    const b=new Blob([swCode],{type:'text/javascript'});
+    const u=URL.createObjectURL(b);
+    _swReg=await navigator.serviceWorker.register(u);
+    console.log('SW registered');
+  }catch(e){console.log('SW error:',e);}
+}
+initSW();
+
+// Show local notification via SW (works when app is open or in background on Android)
+async function showLocalNotif(title,body,tag){
+  // Try SW notification first (shows in notification tray)
+  if(_swReg&&Notification.permission==='granted'){
+    try{
+      await _swReg.showNotification(title,{
+        body,
+        tag:tag||'ifa-alert',
+        icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="%23CC0000"/><text x="32" y="44" font-size="28" font-weight="bold" fill="white" text-anchor="middle">IFA</text></svg>',
+        requireInteraction:false,
+        vibrate:[200,100,200]
+      });
+      return;
+    }catch(e){}
+  }
+  // Fallback to basic Notification API
+  if(Notification.permission==='granted'){
+    try{new Notification(title,{body,tag:tag||'ifa-alert'});}catch(e){}
+  }
+}
+
+// Check and send notifications - runs every time calcNotifs runs
+let _lastNotifCheck=0;
+let _sentNotifTags=new Set();
+
+async function sendPendingNotifs(notifs){
+  const now=Date.now();
+  // Only send once per hour max
+  if(now-_lastNotifCheck<3600000&&_sentNotifTags.size>0)return;
+  if(Notification.permission!=='granted')return;
+  _lastNotifCheck=now;
+  
+  const crit=notifs.filter(n=>n.type==='crit');
+  const warn=notifs.filter(n=>n.type==='warn');
+  const upco=notifs.filter(n=>n.type==='upco');
+  
+  if(crit.length>0){
+    const tag='ifa-overdue-'+new Date().toDateString();
+    if(!_sentNotifTags.has(tag)){
+      _sentNotifTags.add(tag);
+      await showLocalNotif(
+        '⚠️ '+crit.length+' Overdue Payment'+(crit.length>1?'s':''),
+        crit.slice(0,3).map(n=>n.player.fname+' '+n.player.lname).join(', ')+(crit.length>3?' +more':''),
+        tag
+      );
+    }
+  }
+  if(warn.length>0){
+    const tag='ifa-due3-'+new Date().toDateString();
+    if(!_sentNotifTags.has(tag)){
+      _sentNotifTags.add(tag);
+      await showLocalNotif(
+        '🔔 '+warn.length+' Payment'+(warn.length>1?'s':'')+' Due Soon',
+        warn.slice(0,3).map(n=>n.player.fname+' '+n.player.lname+' ('+n.days+'d)').join(', '),
+        tag
+      );
+    }
+  }
+  if(upco.length>0){
+    const tag='ifa-upcoming-'+new Date().toDateString();
+    if(!_sentNotifTags.has(tag)){
+      _sentNotifTags.add(tag);
+      await showLocalNotif(
+        '📅 '+upco.length+' Upcoming Payment'+(upco.length>1?'s':''),
+        upco.slice(0,3).map(n=>n.player.fname+' '+n.player.lname+' ('+n.days+'d)').join(', '),
+        tag
+      );
+    }
+  }
+  // Reset sent tags daily
+  const dayKey='ifa-notif-day';
+  const today=new Date().toDateString();
+  if(localStorage.getItem(dayKey)!==today){
+    localStorage.setItem(dayKey,today);
+    _sentNotifTags.clear();
+  }
+}
 </script>
 </body>
 </html>
