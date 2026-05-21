@@ -348,12 +348,7 @@ body{height:100%;margin:0;padding:0;font-family:var(--font);color:var(--black);d
     </div>
     <div class="scr" id="scr-notifs">
       <div class="ph"><div class="ph-t">Notifications</div><div class="ph-s" id="nsub">Alerts</div></div>
-      <div class="pills" style="padding-top:9px">
-        <div class="pill on" onclick="filtN('all',this)">All</div>
-        <div class="pill" onclick="filtN('crit',this)">Expired</div>
-        <div class="pill" onclick="filtN('warn',this)">3 days</div>
-        <div class="pill" onclick="filtN('upco',this)">7 days</div>
-      </div>
+      <div style="padding:9px 13px 0;display:flex;gap:7px;flex-wrap:wrap" id="notif-summary"></div>
       <div id="nlist" style="padding:9px 13px 80px"></div>
     </div>
     <div class="scr" id="scr-admin">
@@ -1268,22 +1263,45 @@ function calcNotifs(){
   // Send background notifications
   sendPendingNotifs(allNotifs);
 }
-function filtN(t,el){notifFilt=t;document.querySelectorAll('#scr-notifs .pills .pill').forEach(p=>p.classList.remove('on'));if(el)el.classList.add('on');renderNotifs();}
 function renderNotifs(){
-  const sub=document.getElementById('nsub');const list=document.getElementById('nlist');if(!list)return;
-  let f=allNotifs;
-  if(notifFilt==='crit')f=allNotifs.filter(n=>n.type==='crit');
-  else if(notifFilt==='warn')f=allNotifs.filter(n=>n.type==='warn');
-  else if(notifFilt==='upco')f=allNotifs.filter(n=>n.type==='upco'); // 7 days
+  const sub=document.getElementById('nsub');
+  const list=document.getElementById('nlist');
+  const summ=document.getElementById('notif-summary');
+  if(!list)return;
+  const f=allNotifs;
+  const crit=f.filter(n=>n.type==='crit').length;
+  const warn=f.filter(n=>n.type==='warn').length;
+  const upco=f.filter(n=>n.type==='upco').length;
   if(sub)sub.textContent=f.length+' alert'+(f.length===1?'':'s');
+  if(summ){
+    let s='';
+    if(crit>0)s+=`<span style="background:var(--red-light);color:var(--red-text);border-radius:20px;padding:4px 11px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-alert-circle" style="font-size:12px"></i>${crit} Overdue</span>`;
+    if(warn>0)s+=`<span style="background:var(--amber-light);color:var(--amber-text);border-radius:20px;padding:4px 11px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-clock" style="font-size:12px"></i>${warn} Due soon</span>`;
+    if(upco>0)s+=`<span style="background:#E8F5E9;color:#1A7A3A;border-radius:20px;padding:4px 11px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px"><i class="ti ti-calendar" style="font-size:12px"></i>${upco} Upcoming</span>`;
+    summ.innerHTML=s;
+    summ.style.paddingBottom=f.length?'9px':'0';
+  }
   if(!f.length){list.innerHTML='<div class="empty"><i class="ti ti-check" style="color:var(--green)"></i><p>No alerts right now</p></div>';return;}
   const ci={'crit':'var(--red-light)','warn':'var(--amber-light)','upco':'#E8F5E9'};
   const ii={'crit':'ti-alert-circle','warn':'ti-clock','upco':'ti-calendar'};
   const ic={'crit':'var(--red)','warn':'var(--amber)','upco':'#1A7A3A'};
-  list.innerHTML=f.map(n=>{
-    const p=n.player;const avH=p.photo?`<img src="${p.photo}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0">`:`<div style="width:34px;height:34px;border-radius:50%;background:${ci[n.type]};display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ${ii[n.type]}" style="color:${ic[n.type]};font-size:17px"></i></div>`;
-    return`<div class="ni ${n.type}" onclick="goScr('players',document.querySelector('.bn:nth-child(2)'));setTimeout(()=>openPD('${n.id}'),200)">${avH}<div style="flex:1"><div class="ni-t">${n.title}</div><div class="ni-d">${n.desc}</div></div><i class="ti ti-chevron-right" style="color:var(--gray-text);font-size:15px;flex-shrink:0"></i></div>`;
-  }).join('');
+  // Group by type with section headers
+  const sections=[
+    {type:'crit',label:'⚠️ Overdue',items:f.filter(n=>n.type==='crit')},
+    {type:'warn',label:'🔔 Due within 3 days',items:f.filter(n=>n.type==='warn')},
+    {type:'upco',label:'📅 Upcoming (4–7 days)',items:f.filter(n=>n.type==='upco')},
+  ];
+  let html2='';
+  sections.forEach(sec=>{
+    if(!sec.items.length)return;
+    html2+=`<div style="font-size:10px;font-weight:700;color:var(--gray-text);letter-spacing:.6px;text-transform:uppercase;margin:12px 0 6px">${sec.label}</div>`;
+    sec.items.forEach(n=>{
+      const p=n.player;
+      const avH=p.photo?`<img src="${p.photo}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0">`:`<div style="width:34px;height:34px;border-radius:50%;background:${ci[n.type]};display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ${ii[n.type]}" style="color:${ic[n.type]};font-size:17px"></i></div>`;
+      html2+=`<div class="ni ${n.type}" onclick="goScr('players',document.querySelector('.bn:nth-child(2)'));setTimeout(()=>openPD('${n.id}'),200)">${avH}<div style="flex:1"><div class="ni-t">${n.title}</div><div class="ni-d">${n.desc}</div></div><i class="ti ti-chevron-right" style="color:var(--gray-text);font-size:15px;flex-shrink:0"></i></div>`;
+    });
+  });
+  list.innerHTML=html2;
 }
 
 // ── ADMIN ─────────────────────────────────────
