@@ -651,33 +651,33 @@ async function autoUpdateStatuses(){
   const today=new Date();today.setHours(0,0,0,0);
   for(const p of ps){
     if(p.isFree||p.status==='free')continue;
-    // For paid players, check if next payment date is approaching
-    if(p.status==='paid'){
-      const nextDue=getNextPayDate(p);
-      const today2=new Date();today2.setHours(0,0,0,0);
-      const daysLeft=Math.ceil((nextDue-today2)/864e5);
-      if(daysLeft<=0){
-        // Next payment overdue - reset to overdue
-        try{await window._updP(p.id,{status:'overdue'});}catch(e){}
-      } else if(daysLeft<=7){
-        // Next payment upcoming - reset to upcoming
-        try{await window._updP(p.id,{status:'upcoming'});}catch(e){}
-      }
-      continue;
-    }
     const lastDue=getLastDueDate(p);
     const nextDue=getNextPayDate(p);
     const daysOverdue=Math.floor((today-lastDue)/864e5);
     const daysUntilNext=Math.ceil((nextDue-today)/864e5);
     let newStatus=p.status;
-    if(daysOverdue>=0){
-      // Last due date has passed and not paid = overdue
-      newStatus='overdue';
-    } else if(daysUntilNext<=7){
-      // Next due date is within 7 days = upcoming
-      newStatus='upcoming';
+
+    if(p.status==='paid'){
+      // Paid players: check if next payment cycle is approaching
+      if(daysUntilNext<=0){
+        // Next due date has passed → reset to overdue (new month cycle started unpaid)
+        newStatus='overdue';
+      } else if(daysUntilNext<=7){
+        // Next due date is within 7 days → change to upcoming
+        newStatus='upcoming';
+      }
+      // Otherwise paid stays paid
+    } else {
+      // Unpaid/upcoming/overdue players
+      if(daysOverdue>=0){
+        // Last due date has passed and not paid = overdue
+        newStatus='overdue';
+      } else if(daysUntilNext<=7){
+        // Next due date is within 7 days = upcoming
+        newStatus='upcoming';
+      }
     }
-    // paid stays paid, 6+ days stays as-is
+
     if(newStatus!==p.status){
       try{await window._updP(p.id,{status:newStatus});}catch(e){}
     }
@@ -977,7 +977,7 @@ async function confirmRec(){
   const btn=document.getElementById('recbtn');btn.textContent='Saving…';btn.disabled=true;
   const p=(window._ps||[]).find(x=>x.id===recID);
   try{
-    await window._updP(recID,{status:'paid',lastPaidDate:new Date().toISOString().split('T')[0]});
+    await window._updP(recID,{status:'paid'});
     await window._addRec(recID,{month:document.getElementById('rmon').value,date:document.getElementById('rdat').value,amount:parseInt(document.getElementById('ramt').value)||750,method:document.getElementById('rmeth').value,imageData:recImgData||''});
     await window._logAct((p?.fname||'')+' '+(p?.lname||'')+' paid','paid');
     closeM();toast('Marked as Paid!');setTimeout(()=>openPD(recID),300);
@@ -1113,15 +1113,7 @@ function getLastDueDate(p){
 }
 
 function getNextPayDate(p){
-  // For PAID players: next payment = lastPaidDate + 1 month
-  if(p.status==='paid'&&p.lastPaidDate){
-    const paid=new Date(p.lastPaidDate);
-    if(!isNaN(paid)){
-      const next=new Date(paid.getFullYear(),paid.getMonth()+1,paid.getDate());
-      return next;
-    }
-  }
-  // For others: use regdate anchor
+  // Always use regdate anchor
   const lastDue=getLastDueDate(p);
   const next=new Date(lastDue);
   next.setMonth(next.getMonth()+1);
@@ -1137,10 +1129,7 @@ function getDaysLabel(p){
   const daysUntilNext=Math.ceil((nextDue-today)/864e5); // days until next due
 
   if(p.status==='paid'){
-    // Paid — show countdown to NEXT payment
-    if(daysUntilNext<=0)return{txt:'Due today!',col:'#CC0000',bg:'#FCE8E8'};
-    if(daysUntilNext<=3)return{txt:'Next in '+daysUntilNext+'d',col:'#E65100',bg:'#FFF3E0'};
-    if(daysUntilNext<=7)return{txt:'Paid · '+daysUntilNext+'d left',col:'#B07000',bg:'#FFF3D0'};
+    if(daysUntilNext<=3)return{txt:'Next in '+daysUntilNext+'d',col:'#1A7A3A',bg:'#E8F5E9'};
     return{txt:'Paid · '+daysUntilNext+'d left',col:'#1A7A3A',bg:'#E8F5E9'};
   }
 
