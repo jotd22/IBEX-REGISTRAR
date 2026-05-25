@@ -650,34 +650,20 @@ async function autoUpdateStatuses(){
   const ps=window._ps||[];
   const today=new Date();today.setHours(0,0,0,0);
   for(const p of ps){
-    if(p.isFree||p.status==='free')continue;
+    if(p.isFree||p.status==='free'||p.status==='paid')continue;
     const lastDue=getLastDueDate(p);
     const nextDue=getNextPayDate(p);
     const daysOverdue=Math.floor((today-lastDue)/864e5);
     const daysUntilNext=Math.ceil((nextDue-today)/864e5);
     let newStatus=p.status;
-
-    if(p.status==='paid'){
-      // Paid players: check if next payment cycle is approaching
-      if(daysUntilNext<=0){
-        // Next due date has passed → reset to overdue (new month cycle started unpaid)
-        newStatus='overdue';
-      } else if(daysUntilNext<=7){
-        // Next due date is within 7 days → change to upcoming
-        newStatus='upcoming';
-      }
-      // Otherwise paid stays paid
-    } else {
-      // Unpaid/upcoming/overdue players
-      if(daysOverdue>=0){
-        // Last due date has passed and not paid = overdue
-        newStatus='overdue';
-      } else if(daysUntilNext<=7){
-        // Next due date is within 7 days = upcoming
-        newStatus='upcoming';
-      }
+    if(daysOverdue>=0){
+      // Last due date has passed and not paid = overdue
+      newStatus='overdue';
+    } else if(daysUntilNext<=7){
+      // Next due date is within 7 days = upcoming
+      newStatus='upcoming';
     }
-
+    // paid stays paid, 6+ days stays as-is
     if(newStatus!==p.status){
       try{await window._updP(p.id,{status:newStatus});}catch(e){}
     }
@@ -1113,7 +1099,7 @@ function getLastDueDate(p){
 }
 
 function getNextPayDate(p){
-  // Always use regdate anchor
+  // The next upcoming due date (always in the future)
   const lastDue=getLastDueDate(p);
   const next=new Date(lastDue);
   next.setMonth(next.getMonth()+1);
@@ -1129,6 +1115,7 @@ function getDaysLabel(p){
   const daysUntilNext=Math.ceil((nextDue-today)/864e5); // days until next due
 
   if(p.status==='paid'){
+    // Paid — show countdown to NEXT payment
     if(daysUntilNext<=3)return{txt:'Next in '+daysUntilNext+'d',col:'#1A7A3A',bg:'#E8F5E9'};
     return{txt:'Paid · '+daysUntilNext+'d left',col:'#1A7A3A',bg:'#E8F5E9'};
   }
