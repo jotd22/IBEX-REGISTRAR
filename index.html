@@ -1201,19 +1201,26 @@ function normalizePlayer(p) {
   }
   // Fee: old uses fee (number), new uses fee — same, just ensure number
   if (p.fee) p.fee = Number(p.fee);
-  // Due day: old may use dueDate string or paymentDay, new uses dueDay number
+  // regDate: old uses regdate, new uses regDate
+  if (!p.regDate && p.regdate) p.regDate = p.regdate;
+  // Due day: derive from registration date if not set
+  // e.g. registered 2026-05-08 → dueDay = 8 (8th of every month)
   if (!p.dueDay && p.paymentDay) p.dueDay = Number(p.paymentDay);
   if (!p.dueDay && p.dueDate) {
     const d = new Date(p.dueDate);
     if (!isNaN(d)) p.dueDay = d.getDate();
   }
-  // Status override: if old data has status field, map it
+  if (!p.dueDay && p.regDate) {
+    const d = new Date(p.regDate);
+    if (!isNaN(d)) p.dueDay = d.getDate();
+  }
+  // Cap dueDay at 28 to avoid month-end issues
+  if (p.dueDay) p.dueDay = Math.min(Number(p.dueDay), 28);
+  // Status override: if old data has status field = 'paid', honour it
   if (!p.paidUntil && p.status === 'paid') {
     const now = today();
     p.paidUntil = { toDate: () => new Date(now.getFullYear(), now.getMonth()+1, p.dueDay||1) };
   }
-  // regDate: old uses regdate, new uses regDate
-  if (!p.regDate && p.regdate) p.regDate = p.regdate;
   return p;
 }
 
@@ -1693,7 +1700,7 @@ async function showPlayerDetail(playerId) {
           <div class="info-row"><span class="info-label">Player Type</span><span class="info-value">${p.type==='scholar'?'Scholar / Free':'Monthly Paying'}</span></div>
           <div class="info-row"><span class="info-label">Registration Date</span><span class="info-value">${p.regDate||'—'}</span></div>
           <div class="info-row"><span class="info-label">Monthly Fee</span><span class="info-value">${p.type==='scholar'?'Free':`${(p.fee||0).toLocaleString()} ETB`}</span></div>
-          <div class="info-row"><span class="info-label">Payment Due Day</span><span class="info-value">${p.dueDay?`Day ${p.dueDay} of each month`:'N/A'}</span></div>
+          <div class="info-row"><span class="info-label">Payment Due Day</span><span class="info-value">${p.dueDay?`Day ${p.dueDay} of each month (from reg. date)`:'N/A'}</span></div>
           ${p.notes?`<div class="info-row"><span class="info-label">Notes</span><span class="info-value">${p.notes}</span></div>`:''}
         </div>
       </div>
