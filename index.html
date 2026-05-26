@@ -581,7 +581,7 @@ tr:hover td{background:var(--surface2)}
           <span class="filter-chip" onclick="filterPlayers('overdue',this)">⚠️ Overdue</span>
           <span class="filter-chip" onclick="filterPlayers('paid',this)">✅ Paid</span>
         </div>
-        <div id="players-card-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
+        <div id="players-card-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
           <div style="text-align:center;padding:40px;color:var(--text-muted);grid-column:1/-1">Loading players...</div>
         </div>
       </div>
@@ -681,12 +681,10 @@ tr:hover td{background:var(--surface2)}
               <thead>
                 <tr>
                   <th>Player</th>
-                  <th>Branch</th>
                   <th>Status</th>
-                  <th>Due Date</th>
-                  <th>Amount</th>
-                  <th>Last Paid</th>
-                  <th>Actions</th>
+                  <th>Due</th>
+                  <th>Fee</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody id="payments-table-body">
@@ -1081,8 +1079,38 @@ tr:hover td{background:var(--surface2)}
       <div class="bn-icon">🔔</div><div class="bn-label">Alerts</div>
       <div class="bn-badge" id="bn-notif-badge" style="display:none">0</div>
     </div>
+    <div class="bn-item" onclick="showMobileMenu()" id="bn-more">
+      <div class="bn-icon">⋯</div><div class="bn-label">More</div>
+    </div>
   </div>
 </nav>
+
+<!-- MOBILE MORE MENU -->
+<div id="mobile-more-menu" style="display:none;position:fixed;bottom:64px;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:350;padding:8px 16px 16px;box-shadow:0 -4px 20px rgba(0,0,0,0.08)">
+  <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px" id="more-menu-items">
+    <div onclick="showPanel('branches');closeMobileMenu()" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 10px;text-align:center;cursor:pointer">
+      <div style="font-size:22px;margin-bottom:4px">🏟</div>
+      <div style="font-size:12px;font-weight:500;color:var(--text-primary)">Branches</div>
+    </div>
+    <div onclick="showPanel('reports');closeMobileMenu()" class="admin-only" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 10px;text-align:center;cursor:pointer">
+      <div style="font-size:22px;margin-bottom:4px">📄</div>
+      <div style="font-size:12px;font-weight:500;color:var(--text-primary)">Reports</div>
+    </div>
+    <div onclick="showPanel('accounts');closeMobileMenu()" class="admin-only" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 10px;text-align:center;cursor:pointer">
+      <div style="font-size:22px;margin-bottom:4px">👥</div>
+      <div style="font-size:12px;font-weight:500;color:var(--text-primary)">Accounts</div>
+    </div>
+    <div onclick="showPanel('settings');closeMobileMenu()" class="admin-only" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 10px;text-align:center;cursor:pointer">
+      <div style="font-size:22px;margin-bottom:4px">⚙️</div>
+      <div style="font-size:12px;font-weight:500;color:var(--text-primary)">Settings</div>
+    </div>
+    <div onclick="handleLogout();closeMobileMenu()" style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:14px 10px;text-align:center;cursor:pointer">
+      <div style="font-size:22px;margin-bottom:4px">🚪</div>
+      <div style="font-size:12px;font-weight:500;color:var(--overdue)">Sign Out</div>
+    </div>
+  </div>
+</div>
 
 <!-- TOAST CONTAINER -->
 <div class="toast-container" id="toast-container"></div>
@@ -1095,7 +1123,7 @@ tr:hover td{background:var(--surface2)}
 //  https://console.firebase.google.com → Project Settings → Your apps
 // ============================================================
 const FIREBASE_CONFIG = {
-   apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
+  apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
 authDomain: "ibex-academy-registrar.firebaseapp.com",
 projectId: "ibex-academy-registrar",
 storageBucket: "ibex-academy-registrar.firebasestorage.app",
@@ -1661,48 +1689,29 @@ function renderPlayersCards(forceFilter) {
     const status = getPaymentStatus(p);
     const color = getBranchColor(p.branch);
     const statusColors = {paid:'var(--paid)',upcoming:'var(--upcoming)',overdue:'var(--overdue)',payment_day:'var(--payment-day)',scholar:'var(--scholar)'};
-    const sc = statusColors[status] || 'var(--text-muted)';
-    const photoHtml = p.photo
-      ? `<img src="${p.photo}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid ${color}" onerror="this.style.display='none'"/>`
-      : `<div style="width:48px;height:48px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:#fff;flex-shrink:0">${getInitials(p.name)}</div>`;
-    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);transition:all 0.15s" onmouseover="this.style.boxShadow='var(--shadow)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,0.04)';this.style.transform=''">
-      <div style="height:4px;background:${color}"></div>
-      <div style="padding:14px">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;cursor:pointer" onclick="showPlayerDetail('${p.id}')">
-          ${photoHtml}
+    const sc = statusColors[status]||'var(--text-muted)';
+    const avatarHtml = p.photo
+      ? `<img src="${p.photo}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'"/>`
+      : `<div style="width:38px;height:38px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0">${getInitials(p.name)}</div>`;
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer" onclick="showPlayerDetail('${p.id}')">
+      <div style="height:3px;background:${color}"></div>
+      <div style="padding:12px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          ${avatarHtml}
           <div style="flex:1;min-width:0">
-            <div style="font-weight:600;font-size:14px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:1px">${p.age?`Age ${p.age} · `:''}${p.jersey?`#${p.jersey} · `:''}${p.phone||''}</div>
+            <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+            <div style="font-size:11px;color:var(--text-muted)">${p.age?`${p.age}y ·`:''} ${p.jersey?`#${p.jersey} ·`:''} ${getBranchName(p.branch)}</div>
           </div>
-          <div style="font-size:13px;font-weight:700;color:${color};font-family:var(--font-mono)">${p.jersey?`#${p.jersey}`:''}</div>
+          ${statusBadge(status)}
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;cursor:pointer" onclick="showPlayerDetail('${p.id}')">
-          <div style="background:var(--surface2);border-radius:8px;padding:8px 10px">
-            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Branch</div>
-            <div style="font-size:12px;font-weight:500;color:${color}">${getBranchName(p.branch)}</div>
-          </div>
-          <div style="background:var(--surface2);border-radius:8px;padding:8px 10px">
-            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Type</div>
-            <div style="font-size:12px;font-weight:500;color:var(--text-primary)">${p.type==='scholar'?'🎓 Scholar':'💳 Paying'}</div>
-          </div>
-          <div style="background:var(--surface2);border-radius:8px;padding:8px 10px">
-            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Status</div>
-            <div style="font-size:12px;font-weight:600;color:${sc}">${statusBadge(status)}</div>
-          </div>
-          <div style="background:var(--surface2);border-radius:8px;padding:8px 10px">
-            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Monthly Fee</div>
-            <div style="font-size:12px;font-weight:600;color:var(--text-primary)">${p.type==='scholar'?'Free':`${(p.fee||0).toLocaleString()} ETB`}</div>
-          </div>
-          <div style="background:var(--surface2);border-radius:8px;padding:8px 10px;grid-column:1/-1">
-            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Due Date</div>
-            <div style="font-size:12px;font-weight:500;color:var(--text-primary)">${p.dueDay?`Day ${p.dueDay} of every month`:'—'}</div>
-          </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:10px;gap:8px">
+          <span>📅 Day ${p.dueDay||'—'} monthly</span>
+          <span style="font-weight:600;color:var(--text-primary)">${p.type==='scholar'?'Free':`${(p.fee||0).toLocaleString()} ETB`}</span>
         </div>
-        <div style="display:flex;gap:6px;border-top:1px solid var(--border-light);padding-top:10px">
-          <button style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px;font-size:12px;cursor:pointer;color:var(--text-secondary)" onclick="showPlayerDetail('${p.id}')">👤 Profile</button>
-          ${p.type!=='scholar'&&status!=='paid'?`<button style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:7px;font-size:12px;cursor:pointer;color:var(--paid);font-weight:500" onclick="openPaymentConfirm('${p.id}')">💳 Pay</button>`:''}
-          ${canEdit?`<button style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer;color:var(--text-secondary)" onclick="editPlayer('${p.id}')">✏️</button>`:''}
-          ${currentUserRole==='admin'?`<button style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer;color:var(--overdue)" onclick="deletePlayer('${p.id}','${p.name}')">🗑️</button>`:''}
+        <div style="display:flex;gap:5px" onclick="event.stopPropagation()">
+          ${p.type!=='scholar'&&status!=='paid'?`<button style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:7px;padding:6px;font-size:11px;cursor:pointer;color:var(--paid);font-weight:500" onclick="openPaymentConfirm('${p.id}')">💳 Pay</button>`:'<div style="flex:1"></div>'}
+          ${canEdit?`<button style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer" onclick="editPlayer('${p.id}')">✏️</button>`:''}
+          ${currentUserRole==='admin'?`<button style="background:#fef2f2;border:1px solid #fecaca;border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer;color:var(--overdue)" onclick="deletePlayer('${p.id}','${p.name}')">🗑️</button>`:''}
         </div>
       </div>
     </div>`;
@@ -1934,7 +1943,7 @@ function renderPaymentsTable(forceFilter) {
 
   const tbody = document.getElementById('payments-table-body');
   if (!players.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">No payments found</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">No payments found</td></tr>`;
     return;
   }
 
@@ -1942,24 +1951,21 @@ function renderPaymentsTable(forceFilter) {
     const status = getPaymentStatus(p);
     const dueDate = getDueDate(p);
     const lastPaid = p.lastPaid ? formatDate(p.lastPaid) : '—';
-    return `<tr>
+    return `<tr style="cursor:pointer" onclick="showPlayerDetail('${p.id}')">
       <td>
-        <div class="flex" style="gap:10px;cursor:pointer" onclick="showPlayerDetail('${p.id}')">
-          <div class="avatar avatar-sm" style="background:${getBranchColor(p.branch)}">${getInitials(p.name)}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:32px;height:32px;border-radius:50%;background:${getBranchColor(p.branch)};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0">${getInitials(p.name)}</div>
           <div>
             <div style="font-weight:500;font-size:13px">${p.name}</div>
-            <div style="font-size:11px;color:var(--text-muted)">${p.phone}</div>
+            <div style="font-size:11px;color:var(--text-muted)">${getBranchName(p.branch)}</div>
           </div>
         </div>
       </td>
-      <td>${branchBadge(p.branch)}</td>
       <td>${statusBadge(status)}</td>
-      <td style="font-size:13px">${dueDate ? `Day ${p.dueDay} monthly` : '—'}</td>
-      <td style="font-family:var(--font-mono);font-size:13px">${p.type==='scholar'?'Free':`${(p.fee||0).toLocaleString()} ETB`}</td>
-      <td style="font-size:13px">${lastPaid}</td>
-      <td>
-        ${p.type!=='scholar'&&status!=='paid'?`<button class="btn btn-success btn-xs" onclick="openPaymentConfirm('${p.id}')">💳 Confirm</button>`:
-        status==='paid'?'<span style="color:var(--paid);font-size:12px">✅ Paid</span>':''}
+      <td style="font-size:12px;color:var(--text-muted)">Day ${p.dueDay||'—'}</td>
+      <td style="font-weight:600;font-size:12px">${p.type==='scholar'?'Free':`${(p.fee||0).toLocaleString()} ETB`}</td>
+      <td onclick="event.stopPropagation()">
+        ${p.type!=='scholar'&&status!=='paid'?`<button class="btn btn-success btn-xs" onclick="openPaymentConfirm('${p.id}')">💳 Pay</button>`:status==='paid'?'<span style="color:var(--paid);font-size:11px">✅ Paid</span>':''}
       </td>
     </tr>`;
   }).join('');
@@ -2626,7 +2632,33 @@ function updateNotifBadge() {
 function setBottomNav(el) {
   document.querySelectorAll('.bn-item').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
+  closeMobileMenu();
 }
+
+function showMobileMenu() {
+  const menu = document.getElementById('mobile-more-menu');
+  if (!menu) return;
+  const isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  const bn = document.getElementById('bn-more');
+  if (bn) bn.classList.toggle('active', !isOpen);
+}
+
+function closeMobileMenu() {
+  const menu = document.getElementById('mobile-more-menu');
+  if (menu) menu.style.display = 'none';
+  const bn = document.getElementById('bn-more');
+  if (bn) bn.classList.remove('active');
+}
+
+// Close more menu when tapping outside
+document.addEventListener('click', e => {
+  const menu = document.getElementById('mobile-more-menu');
+  const btn = document.getElementById('bn-more');
+  if (menu && menu.style.display !== 'none' && !menu.contains(e.target) && btn && !btn.contains(e.target)) {
+    closeMobileMenu();
+  }
+});
 
 window.addEventListener('load', () => {
   setTimeout(() => {
