@@ -20,7 +20,7 @@
   --border:#e2e6ed;--border-light:#eaecf0;
   --text-primary:#1a1d23;--text-secondary:#5a6270;--text-muted:#9aa0ab;
   --branch-cmc1:#2d7dd2;--branch-cmc2:#27ae60;--branch-pepsi:#e67e22;--branch-tafo:#9b59b6;
-  --paid:#16a34a;--upcoming:#d97706;--overdue:#dc2626;--payment-day:#ea580c;--scholar:#64748b;
+  --paid:#16a34a;--upcoming:#d97706;--overdue:#dc2626;--payment-day:#ea580c;--scholar:#2563eb;
   --font-display:'Bebas Neue',sans-serif;--font-body:'DM Sans',sans-serif;--font-mono:'JetBrains Mono',monospace;
   --radius:10px;--radius-lg:14px;--radius-xl:20px;
   --shadow:0 1px 4px rgba(0,0,0,0.08),0 4px 16px rgba(0,0,0,0.06);
@@ -161,7 +161,7 @@ select.form-input option{background:var(--white)}
 .badge-upcoming{background:#fef9c3;color:#a16207}
 .badge-overdue{background:#fee2e2;color:#dc2626}
 .badge-payment-day{background:#fff7ed;color:#ea580c}
-.badge-scholar{background:#f1f5f9;color:#64748b}
+.badge-scholar{background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe}
 .badge-branch-cmc1{background:#eff6ff;color:var(--branch-cmc1)}
 .badge-branch-cmc2{background:#f0fdf4;color:var(--branch-cmc2)}
 .badge-branch-pepsi{background:#fff7ed;color:var(--branch-pepsi)}
@@ -1132,6 +1132,68 @@ tr:hover td{background:var(--surface2)}
   </div>
 </div>
 
+<!-- IMAGE CROP MODAL -->
+<div class="modal-overlay" id="crop-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">Crop Photo</div>
+      <button class="modal-close" onclick="closeModal('crop-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Drag to move · Pinch or scroll to zoom · Circle shows the crop area</p>
+      <div style="position:relative;width:100%;overflow:hidden;border-radius:12px;background:#000;touch-action:none" id="crop-container">
+        <canvas id="crop-canvas" style="display:block;width:100%;touch-action:none"></canvas>
+        <div id="crop-overlay" style="position:absolute;inset:0;pointer-events:none">
+          <div id="crop-circle" style="position:absolute;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 9999px rgba(0,0,0,0.55)"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:14px">
+        <span style="font-size:12px;color:var(--text-muted)">Zoom</span>
+        <input type="range" id="crop-zoom" min="0.5" max="3" step="0.05" value="1" style="flex:1;accent-color:var(--red)" oninput="drawCrop()"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('crop-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="applyCrop()">✅ Use This Photo</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS OVERRIDE MODAL -->
+<div class="modal-overlay" id="status-override-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">Change Payment Status</div>
+      <button class="modal-close" onclick="closeModal('status-override-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="override-player-id"/>
+      <div id="override-player-info" style="margin-bottom:16px"></div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Choose a status to set manually. The automatic system will resume on the next payment cycle when payment is confirmed.</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button onclick="setManualStatus('paid')" style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;padding:14px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:12px">
+          <span style="font-size:22px">✅</span>
+          <div><div style="font-weight:600;color:var(--paid)">Paid</div><div style="font-size:12px;color:var(--text-muted)">Mark as paid — no payment required until next cycle</div></div>
+        </button>
+        <button onclick="setManualStatus('upcoming')" style="background:#fef9c3;border:1.5px solid #fde68a;border-radius:10px;padding:14px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:12px">
+          <span style="font-size:22px">⏰</span>
+          <div><div style="font-weight:600;color:var(--upcoming)">Upcoming</div><div style="font-size:12px;color:var(--text-muted)">Payment is coming up soon</div></div>
+        </button>
+        <button onclick="setManualStatus('overdue')" style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;padding:14px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:12px">
+          <span style="font-size:22px">⚠️</span>
+          <div><div style="font-weight:600;color:var(--overdue)">Overdue</div><div style="font-size:12px;color:var(--text-muted)">Payment is overdue and needs attention</div></div>
+        </button>
+        <button onclick="setManualStatus(null)" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:14px;text-align:left;cursor:pointer;display:flex;align-items:center;gap:12px">
+          <span style="font-size:22px">🔁</span>
+          <div><div style="font-weight:600;color:var(--text-primary)">Reset to Automatic</div><div style="font-size:12px;color:var(--text-muted)">Remove manual override — let the system decide</div></div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST CONTAINER -->
 <div class="toast-container" id="toast-container"></div>
 
@@ -1143,14 +1205,13 @@ tr:hover td{background:var(--surface2)}
 //  https://console.firebase.google.com → Project Settings → Your apps
 // ============================================================
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
+ apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
 authDomain: "ibex-academy-registrar.firebaseapp.com",
 projectId: "ibex-academy-registrar",
 storageBucket: "ibex-academy-registrar.firebasestorage.app",
 messagingSenderId: "260284443908",
 appId: "1:260284443908:web:29fdc60ede231f368f7451"
-
-};
+  };
 
 // Initialize Firebase
 firebase.initializeApp(FIREBASE_CONFIG);
@@ -1323,6 +1384,11 @@ function normalizePlayer(p) {
 // =====================================================================
 function getPaymentStatus(player) {
   if (player.type === 'scholar') return 'scholar';
+  // Manual override — admin/registrar can set this directly
+  // Auto system resets it when payment is confirmed
+  if (player.manualStatus && ['paid','upcoming','overdue'].includes(player.manualStatus)) {
+    return player.manualStatus;
+  }
   if (!player.dueDay) return 'upcoming';
 
   const now = today();
@@ -1584,7 +1650,7 @@ function renderBranchesPanel() {
       <div class="branch-card-stats">
         <div class="branch-stat"><div class="branch-stat-val" style="color:${b.color}">${players.length}</div><div class="branch-stat-lbl">Total Players</div></div>
         <div class="branch-stat"><div class="branch-stat-val" style="color:var(--paid)">${paying.length}</div><div class="branch-stat-lbl">Paying</div></div>
-        <div class="branch-stat"><div class="branch-stat-val" style="color:var(--scholar)">${scholars.length}</div><div class="branch-stat-lbl">Scholars</div></div>
+        <div class="branch-stat"><div class="branch-stat-val" style="color:#2563eb">${scholars.length}</div><div class="branch-stat-lbl">Scholars</div></div>
         <div class="branch-stat"><div class="branch-stat-val" style="color:var(--overdue)">${overdue.length}</div><div class="branch-stat-lbl">Overdue</div></div>
       </div>
     </div>`;
@@ -1824,7 +1890,8 @@ async function showPlayerDetail(playerId) {
         <div style="text-align:center">
           ${p.type==='scholar'?'<span class="badge badge-scholar" style="font-size:13px;padding:6px 16px">🎓 Scholar / Free Player</span>':statusBadge(status)}
         </div>
-        ${p.type!=='scholar'&&status!=='paid'?`<button class="btn btn-success btn-full" onclick="openPaymentConfirm('${p.id}');closeModal('player-detail-modal')">💳 Confirm Payment</button>`:''}
+        ${p.type!=='scholar'?`<button class="btn btn-success btn-full" onclick="openPaymentConfirm('${p.id}');closeModal('player-detail-modal')" style="${status==='paid'?'opacity:0.5':''}">💳 Confirm Payment</button>`:''}
+        ${p.type!=='scholar'?`<button class="btn btn-secondary btn-full mt-1" onclick="openStatusOverrideModal('${p.id}')">🔄 Change Status Manually</button>`:''}
       </div>
       <div>
         <div class="info-list">
@@ -1878,6 +1945,36 @@ async function loadDetailPayments(playerId) {
   } catch(e) {
     document.getElementById('detail-payments').innerHTML = '<p style="color:var(--text-muted)">Unable to load payment history</p>';
   }
+}
+
+function openStatusOverrideModal(playerId) {
+  const p = allPlayers.find(x => x.id === playerId);
+  if (!p) return;
+  document.getElementById('override-player-id').value = playerId;
+  const color = getBranchColor(p.branch);
+  document.getElementById('override-player-info').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;background:var(--surface2);padding:12px;border-radius:10px">
+      <div style="width:38px;height:38px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:14px">${getInitials(p.name)}</div>
+      <div>
+        <div style="font-weight:600">${p.name}</div>
+        <div style="font-size:12px;color:var(--text-muted)">Current: ${statusBadge(getPaymentStatus(p))}</div>
+      </div>
+    </div>`;
+  closeModal('player-detail-modal');
+  openModal('status-override-modal');
+}
+
+async function setManualStatus(status) {
+  const playerId = document.getElementById('override-player-id').value;
+  if (!playerId) return;
+  const p = allPlayers.find(x => x.id === playerId);
+  if (!p) return;
+  try {
+    await db.collection('players').doc(playerId).update({ manualStatus: status || null });
+    const label = status ? status.charAt(0).toUpperCase()+status.slice(1) : 'Automatic';
+    toast(`Status set to "${label}" for ${p.name}`, 'success');
+    closeModal('status-override-modal');
+  } catch(e) { toast('Error: '+e.message, 'error'); }
 }
 
 async function undoLastPayment(playerId, paymentDocId) {
@@ -1986,7 +2083,8 @@ async function confirmPayment() {
     const nextDue = new Date(now.getFullYear(), now.getMonth()+1, p.dueDay||1);
     await db.collection('players').doc(playerId).update({
       paidUntil: firebase.firestore.Timestamp.fromDate(nextDue),
-      lastPaid: firebase.firestore.Timestamp.fromDate(new Date(paidDate))
+      lastPaid: firebase.firestore.Timestamp.fromDate(new Date(paidDate)),
+      manualStatus: null
     });
 
     await logActivity(`Payment confirmed for ${p.name}: ${amount.toLocaleString()} ETB`, 'payment', playerId);
@@ -2612,33 +2710,99 @@ function previewRegReceipt(input) {
   reader.readAsDataURL(file);
 }
 
+// ---- CROP STATE ----
+let _cropImg = null, _cropOffX = 0, _cropOffY = 0, _cropZoom = 1;
+let _cropDragging = false, _cropLastX = 0, _cropLastY = 0;
+let _cropCanvasSize = 280;
+
 function previewPlayerPhoto(input) {
   const file = input.files[0];
   if (!file) return;
-  if (file.size > 8 * 1024 * 1024) { toast('Image too large — max 8MB','error'); return; }
+  if (file.size > 10 * 1024 * 1024) { toast('Image too large — max 10MB','error'); return; }
   const reader = new FileReader();
   reader.onload = e => {
-    // Compress image to max 200x200 px, quality 0.65 — keeps well under Firestore limit
     const image = new Image();
     image.onload = () => {
-      const canvas = document.createElement('canvas');
-      const MAX = 200;
-      let w = image.width, h = image.height;
-      if (w > h) { if (w > MAX) { h = Math.round(h*MAX/w); w = MAX; } }
-      else { if (h > MAX) { w = Math.round(w*MAX/h); h = MAX; } }
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(image, 0, 0, w, h);
-      const compressed = canvas.toDataURL('image/jpeg', 0.65);
-      const img = document.getElementById('player-photo-preview-img');
-      const wrap = document.getElementById('player-photo-preview-wrap');
-      img.src = compressed;
-      img.style.display = 'block';
-      wrap.style.display = 'none';
-      document.getElementById('p-photo').value = compressed;
+      _cropImg = image;
+      _cropZoom = 1; _cropOffX = 0; _cropOffY = 0;
+      document.getElementById('crop-zoom').value = 1;
+      const canvas = document.getElementById('crop-canvas');
+      _cropCanvasSize = Math.min(window.innerWidth - 80, 320);
+      canvas.width = _cropCanvasSize;
+      canvas.height = _cropCanvasSize;
+      // Position crop circle
+      const cc = document.getElementById('crop-circle');
+      const r = _cropCanvasSize * 0.85;
+      const off = (_cropCanvasSize - r) / 2;
+      const pct = (off/_cropCanvasSize*100);
+      const sz = (r/_cropCanvasSize*100);
+      cc.style.left = pct+'%'; cc.style.top = pct+'%';
+      cc.style.width = sz+'%'; cc.style.height = sz+'%';
+      drawCrop();
+      setupCropEvents();
+      openModal('crop-modal');
     };
     image.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+function drawCrop() {
+  if (!_cropImg) return;
+  const canvas = document.getElementById('crop-canvas');
+  const ctx = canvas.getContext('2d');
+  const zoom = parseFloat(document.getElementById('crop-zoom').value);
+  _cropZoom = zoom;
+  const s = _cropCanvasSize;
+  ctx.clearRect(0, 0, s, s);
+  const sw = _cropImg.width * zoom, sh = _cropImg.height * zoom;
+  ctx.drawImage(_cropImg, _cropOffX + (s-sw)/2, _cropOffY + (s-sh)/2, sw, sh);
+}
+
+function setupCropEvents() {
+  const canvas = document.getElementById('crop-canvas');
+  canvas.onmousedown = e => { _cropDragging=true; _cropLastX=e.clientX; _cropLastY=e.clientY; };
+  canvas.onmousemove = e => {
+    if (!_cropDragging) return;
+    _cropOffX += e.clientX-_cropLastX; _cropOffY += e.clientY-_cropLastY;
+    _cropLastX=e.clientX; _cropLastY=e.clientY; drawCrop();
+  };
+  canvas.onmouseup = canvas.onmouseleave = () => { _cropDragging=false; };
+  canvas.ontouchstart = e => { _cropDragging=true; const t=e.touches[0]; _cropLastX=t.clientX; _cropLastY=t.clientY; e.preventDefault(); };
+  canvas.ontouchmove = e => {
+    if (!_cropDragging) return;
+    const t=e.touches[0];
+    _cropOffX += t.clientX-_cropLastX; _cropOffY += t.clientY-_cropLastY;
+    _cropLastX=t.clientX; _cropLastY=t.clientY; drawCrop(); e.preventDefault();
+  };
+  canvas.ontouchend = () => { _cropDragging=false; };
+  canvas.onwheel = e => {
+    const z = parseFloat(document.getElementById('crop-zoom').value);
+    const nz = Math.min(3, Math.max(0.5, z - e.deltaY*0.001));
+    document.getElementById('crop-zoom').value = nz; drawCrop(); e.preventDefault();
+  };
+}
+
+function applyCrop() {
+  if (!_cropImg) return;
+  // Render the circle crop area to a 200x200 output
+  const s = _cropCanvasSize;
+  const r = s * 0.85;
+  const off = (s - r) / 2;
+  const srcCanvas = document.getElementById('crop-canvas');
+  const out = document.createElement('canvas');
+  out.width = 200; out.height = 200;
+  const ctx = out.getContext('2d');
+  ctx.drawImage(srcCanvas, off, off, r, r, 0, 0, 200, 200);
+  const result = out.toDataURL('image/jpeg', 0.72);
+  const img = document.getElementById('player-photo-preview-img');
+  const wrap = document.getElementById('player-photo-preview-wrap');
+  img.src = result;
+  img.style.display = 'block';
+  wrap.style.display = 'none';
+  document.getElementById('p-photo').value = result;
+  closeModal('crop-modal');
+  toast('Photo cropped and ready!','success');
 }
 
 function previewReceipt(input) {
