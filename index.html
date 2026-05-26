@@ -1254,7 +1254,7 @@ tr:hover td{background:var(--surface2)}
 //  https://console.firebase.google.com → Project Settings → Your apps
 // ============================================================
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
+ apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
 authDomain: "ibex-academy-registrar.firebaseapp.com",
 projectId: "ibex-academy-registrar",
 storageBucket: "ibex-academy-registrar.firebasestorage.app",
@@ -1427,8 +1427,8 @@ function normalizePlayer(p) {
     const src = p.regDate || p.regdate;
     if (src) { const d = new Date(src); if (!isNaN(d)) p.dueDay = d.getDate(); }
   }
-  // Cap dueDay at 28 to avoid Feb issues
-  if (p.dueDay) p.dueDay = Math.min(Number(p.dueDay), 28);
+  // Cap dueDay at 30
+  if (p.dueDay) p.dueDay = Math.min(Number(p.dueDay), 30);
   // Status override: if old data has status field = 'paid', honour it
   if (!p.paidUntil && p.status === 'paid') {
     const now = today();
