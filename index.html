@@ -474,6 +474,18 @@ select.form-input option{background:var(--surface2)}
       </div>
       <div class="topbar-right">
         <div id="current-date-display" class="text-sm text-muted font-mono"></div>
+        <div style="position:relative">
+          <button class="btn btn-secondary btn-sm" onclick="toggleNotifications()" id="notif-btn" style="position:relative;padding:8px 12px">
+            🔔 <span id="notif-count" style="display:none;position:absolute;top:-4px;right:-4px;background:var(--red);color:white;font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1" id="notif-count">0</span>
+          </button>
+          <div id="notif-dropdown" style="display:none;position:absolute;top:44px;right:0;width:340px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 8px 32px rgba(0,0,0,0.5);z-index:999;max-height:420px;overflow-y:auto">
+            <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center">
+              <span>🔔 Notifications</span>
+              <button onclick="toggleNotifications()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px">✕</button>
+            </div>
+            <div id="notif-list" style="padding:8px"></div>
+          </div>
+        </div>
         <button class="btn btn-primary btn-sm" id="quick-add-btn" onclick="openAddPlayerModal()">+ Add Player</button>
       </div>
     </div>
@@ -541,6 +553,23 @@ select.form-input option{background:var(--surface2)}
                 <p>No recent activity</p>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div class="overview-grid" style="grid-template-columns:1fr 1fr;margin-bottom:20px">
+          <div class="card" style="border-left:3px solid var(--payment-day);border-radius:0 var(--radius-lg) var(--radius-lg) 0">
+            <div class="card-header" style="margin-bottom:12px">
+              <div class="card-title">📅 Due Today</div>
+              <span id="due-today-count" class="badge badge-payment-day">0</span>
+            </div>
+            <div id="due-today-list"><div style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px">No payments due today 🎉</div></div>
+          </div>
+          <div class="card" style="border-left:3px solid var(--upcoming);border-radius:0 var(--radius-lg) var(--radius-lg) 0">
+            <div class="card-header" style="margin-bottom:12px">
+              <div class="card-title">⏰ Upcoming (5 days)</div>
+              <span id="upcoming-alert-count" class="badge badge-upcoming">0</span>
+            </div>
+            <div id="upcoming-alert-list"><div style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px">No upcoming payments</div></div>
           </div>
         </div>
 
@@ -892,8 +921,8 @@ select.form-input option{background:var(--surface2)}
           </div>
           <div class="form-group">
             <label class="form-label">Payment Due Day (of month) *</label>
-            <input class="form-input" type="number" id="p-due-day" min="1" max="28" placeholder="1"/>
-            <div class="form-hint">Day 1-28 each month</div>
+            <input class="form-input" type="number" id="p-due-day" min="1" max="30" placeholder="1"/>
+            <div class="form-hint">Day 1-30 each month</div>
           </div>
         </div>
       </div>
@@ -938,8 +967,20 @@ select.form-input option{background:var(--surface2)}
         <input class="form-input" type="date" id="confirm-date"/>
       </div>
       <div class="form-group">
-        <label class="form-label">Receipt Note (optional)</label>
+        <label class="form-label">Receipt Number / Note (optional)</label>
         <input class="form-input" type="text" id="confirm-receipt" placeholder="Receipt #, notes..."/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Receipt Photo (optional)</label>
+        <div id="receipt-upload-area" onclick="document.getElementById('confirm-receipt-file').click()" style="border:2px dashed var(--border-light);border-radius:var(--radius);padding:20px;text-align:center;cursor:pointer;background:var(--surface2)">
+          <div id="receipt-upload-preview">
+            <div style="font-size:28px;margin-bottom:6px">📎</div>
+            <div style="font-size:13px;color:var(--text-secondary)">Click to upload receipt photo</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">JPG, PNG supported</div>
+          </div>
+          <img id="receipt-img-preview" src="" style="display:none;max-width:100%;max-height:180px;border-radius:var(--radius);margin-top:8px"/>
+        </div>
+        <input type="file" id="confirm-receipt-file" accept="image/*" style="display:none" onchange="previewReceipt(this)"/>
       </div>
     </div>
     <div class="modal-footer">
@@ -1054,7 +1095,7 @@ select.form-input option{background:var(--surface2)}
 //  https://console.firebase.google.com → Project Settings → Your apps
 // ============================================================
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
+ apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
 authDomain: "ibex-academy-registrar.firebaseapp.com",
 projectId: "ibex-academy-registrar",
 storageBucket: "ibex-academy-registrar.firebasestorage.app",
@@ -1215,7 +1256,7 @@ function normalizePlayer(p) {
     if (!isNaN(d)) p.dueDay = d.getDate();
   }
   // Cap dueDay at 28 to avoid month-end issues
-  if (p.dueDay) p.dueDay = Math.min(Number(p.dueDay), 28);
+  if (p.dueDay) p.dueDay = Math.min(Number(p.dueDay), 30);
   // Status override: if old data has status field = 'paid', honour it
   if (!p.paidUntil && p.status === 'paid') {
     const now = today();
@@ -1728,7 +1769,7 @@ async function loadDetailPayments(playerId) {
             <td style="padding:8px">${r.month||'—'}</td>
             <td style="padding:8px">${formatDate(r.paidDate)}</td>
             <td style="padding:8px;text-align:right;font-family:var(--font-mono)">${(r.amount||0).toLocaleString()} ETB</td>
-            <td style="padding:8px;color:var(--text-muted)">${r.receipt||'—'}</td>
+            <td style="padding:8px;color:var(--text-muted)">${r.receipt||''} ${r.receiptImage?`<br><img src="${r.receiptImage}" style="max-width:80px;max-height:60px;border-radius:4px;margin-top:4px;cursor:pointer" onclick="window.open('${r.receiptImage}','_blank')" title="Click to view full receipt"/>`:''}</td>
           </tr>`).join('')}</tbody></table>`
       : '<div class="empty-state"><div class="empty-state-icon">💳</div><p>No payment records yet</p></div>';
     document.getElementById('detail-payments').innerHTML = html;
@@ -1781,6 +1822,10 @@ function openPaymentConfirm(playerId) {
   document.getElementById('confirm-player-id').value = playerId;
   document.getElementById('confirm-amount').value = p.fee || '';
   document.getElementById('confirm-date').value = formatDateSimple(today());
+  document.getElementById('confirm-receipt-file').value = '';
+  document.getElementById('receipt-img-preview').style.display = 'none';
+  document.getElementById('receipt-img-preview').src = '';
+  document.getElementById('receipt-upload-preview').style.display = '';
   document.getElementById('payment-confirm-info').innerHTML = `
     <div class="flex" style="gap:10px">
       <div class="avatar avatar-md" style="background:${getBranchColor(p.branch)}">${getInitials(p.name)}</div>
@@ -1797,6 +1842,7 @@ async function confirmPayment() {
   const amount = parseFloat(document.getElementById('confirm-amount').value) || 0;
   const paidDate = document.getElementById('confirm-date').value;
   const receipt = document.getElementById('confirm-receipt').value.trim();
+  const receiptImg = document.getElementById('receipt-img-preview').src || null;
   if (!amount || !paidDate) { toast('Amount and date required','error'); return; }
   const p = allPlayers.find(x => x.id === playerId);
   if (!p) return;
@@ -1809,6 +1855,7 @@ async function confirmPayment() {
       playerId, playerName: p.name, branch: p.branch,
       amount, paidDate: firebase.firestore.Timestamp.fromDate(new Date(paidDate)),
       month, receipt: receipt || null,
+      receiptImage: (receiptImg && receiptImg.startsWith('data:')) ? receiptImg : null,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       confirmedBy: currentUser.uid
     });
@@ -2085,6 +2132,54 @@ function renderDashboard() {
         <td><button class="btn btn-success btn-xs" onclick="openPaymentConfirm('${p.id}')">💳 Confirm</button></td>
       </tr>`).join('')
     : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:30px">No overdue payments 🎉</td></tr>';
+
+  // Due Today alert list
+  const dueTodayList = paying.filter(p => getPaymentStatus(p) === 'payment_day');
+  const dueTodayEl = document.getElementById('due-today-list');
+  const dueTodayCount = document.getElementById('due-today-count');
+  if (dueTodayCount) dueTodayCount.textContent = dueTodayList.length;
+  if (dueTodayEl) dueTodayEl.innerHTML = dueTodayList.length
+    ? dueTodayList.map(p => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div class="flex" style="gap:8px">
+            <div class="avatar avatar-sm" style="background:${getBranchColor(p.branch)}">${getInitials(p.name)}</div>
+            <div>
+              <div style="font-size:13px;font-weight:500">${p.name}</div>
+              <div style="font-size:11px;color:var(--text-muted)">${getBranchName(p.branch)}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:12px;font-family:var(--font-mono);color:var(--payment-day)">${(p.fee||0).toLocaleString()} ETB</span>
+            <button class="btn btn-success btn-xs" onclick="openPaymentConfirm('${p.id}')">💳 Pay</button>
+          </div>
+        </div>`).join('')
+    : '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px">No payments due today 🎉</div>';
+
+  // Upcoming alert list
+  const upcomingAlertList = paying.filter(p => getPaymentStatus(p) === 'upcoming');
+  const upcomingAlertEl = document.getElementById('upcoming-alert-list');
+  const upcomingAlertCount = document.getElementById('upcoming-alert-count');
+  if (upcomingAlertCount) upcomingAlertCount.textContent = upcomingAlertList.length;
+  if (upcomingAlertEl) upcomingAlertEl.innerHTML = upcomingAlertList.length
+    ? upcomingAlertList.map(p => {
+        const due = new Date(today().getFullYear(), today().getMonth(), p.dueDay);
+        const daysLeft = Math.floor((due - today()) / (1000*60*60*24));
+        return `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div class="flex" style="gap:8px">
+            <div class="avatar avatar-sm" style="background:${getBranchColor(p.branch)}">${getInitials(p.name)}</div>
+            <div>
+              <div style="font-size:13px;font-weight:500">${p.name}</div>
+              <div style="font-size:11px;color:var(--text-muted)">${getBranchName(p.branch)} · in ${daysLeft} day${daysLeft===1?'':'s'}</div>
+            </div>
+          </div>
+          <span style="font-size:12px;font-family:var(--font-mono);color:var(--upcoming)">${(p.fee||0).toLocaleString()} ETB</span>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px">No upcoming payments</div>';
+
+  // Update notification badge
+  updateNotifBadge();
 }
 
 // =====================================================================
@@ -2374,6 +2469,76 @@ async function saveSettings() {
 // =====================================================================
 //  INIT
 // =====================================================================
+// =====================================================================
+//  RECEIPT UPLOAD
+// =====================================================================
+function previewReceipt(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 3 * 1024 * 1024) { toast('Image too large — max 3MB','error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('receipt-img-preview');
+    const prev = document.getElementById('receipt-upload-preview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    prev.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+// =====================================================================
+//  NOTIFICATIONS
+// =====================================================================
+let notifOpen = false;
+function toggleNotifications() {
+  notifOpen = !notifOpen;
+  document.getElementById('notif-dropdown').style.display = notifOpen ? 'block' : 'none';
+  if (notifOpen) renderNotifications();
+}
+document.addEventListener('click', e => {
+  if (notifOpen && !e.target.closest('#notif-btn') && !e.target.closest('#notif-dropdown')) {
+    notifOpen = false;
+    const dd = document.getElementById('notif-dropdown');
+    if (dd) dd.style.display = 'none';
+  }
+});
+function renderNotifications() {
+  const paying = allPlayers.filter(p => p.type !== 'scholar');
+  const dueToday = paying.filter(p => getPaymentStatus(p) === 'payment_day');
+  const upcoming = paying.filter(p => getPaymentStatus(p) === 'upcoming');
+  const overdue = paying.filter(p => getPaymentStatus(p) === 'overdue');
+  const all = [
+    ...overdue.map(p => ({p, type:'overdue', label:'Overdue'})),
+    ...dueToday.map(p => ({p, type:'payment_day', label:'Due Today'})),
+    ...upcoming.map(p => ({p, type:'upcoming', label:'Upcoming'}))
+  ];
+  const total = all.length;
+  const countEl = document.getElementById('notif-count');
+  if (countEl) { countEl.textContent = total; countEl.style.display = total > 0 ? 'flex' : 'none'; }
+  const list = document.getElementById('notif-list');
+  if (!list) return;
+  if (!all.length) { list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">🎉 All payments are up to date!</div>'; return; }
+  list.innerHTML = all.map(({p, type, label}) => {
+    const colors = {overdue:'var(--overdue)',payment_day:'var(--payment-day)',upcoming:'var(--upcoming)'};
+    const color = colors[type];
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:var(--radius);cursor:pointer;margin-bottom:4px;background:var(--surface2)" onclick="openPaymentConfirm('${p.id}');toggleNotifications()">
+      <div class="avatar avatar-sm" style="background:${getBranchColor(p.branch)};flex-shrink:0">${getInitials(p.name)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+        <div style="font-size:11px;color:var(--text-muted)">${getBranchName(p.branch)} · ${(p.fee||0).toLocaleString()} ETB</div>
+      </div>
+      <span style="font-size:11px;font-weight:500;color:${color};white-space:nowrap">${label}</span>
+    </div>`;
+  }).join('');
+}
+function updateNotifBadge() {
+  const paying = allPlayers.filter(p => p.type !== 'scholar');
+  const count = paying.filter(p => ['overdue','payment_day','upcoming'].includes(getPaymentStatus(p))).length;
+  const el = document.getElementById('notif-count');
+  if (el) { el.textContent = count; el.style.display = count > 0 ? 'flex' : 'none'; }
+}
+
 window.addEventListener('load', () => {
   setTimeout(() => {
     document.getElementById('loading-screen').classList.add('fade');
