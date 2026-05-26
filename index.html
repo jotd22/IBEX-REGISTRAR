@@ -1254,7 +1254,7 @@ tr:hover td{background:var(--surface2)}
 //  https://console.firebase.google.com → Project Settings → Your apps
 // ============================================================
 const FIREBASE_CONFIG = {
- apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
+   apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
 authDomain: "ibex-academy-registrar.firebaseapp.com",
 projectId: "ibex-academy-registrar",
 storageBucket: "ibex-academy-registrar.firebasestorage.app",
@@ -1863,10 +1863,37 @@ function renderPlayersCards(forceFilter) {
           <span>📅 Day ${p.dueDay||'—'} monthly</span>
           <span style="font-weight:600;color:var(--text-primary)">${p.type==='scholar'?'Free':`${(p.fee||0).toLocaleString()} ETB`}</span>
         </div>
-        ${(()=>{ const d=getDaysUntilDue(p); const tdays=(p.trainingDays||p.trainingdays||[]); return `<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px;gap:6px">
-          <span style="color:${d===0?'var(--payment-day)':d<=5?'var(--upcoming)':d<0?'var(--overdue)':'var(--text-muted)'}">⏱ ${d===null?'—':d===0?'Due today':d<0?Math.abs(d)+' days overdue':d+' days left'}</span>
-          <span style="color:var(--branch-cmc1)">${tdays.length?'🏃 '+tdays.join('·'):''}</span>
-        </div>`; })()}
+        ${(()=>{
+          const tdays=(p.trainingDays||p.trainingdays||[]);
+          const st = getPaymentStatus(p);
+          const now = new Date(); now.setHours(0,0,0,0);
+          // Calculate days until next due date (always positive = future)
+          let due = p.dueDay ? new Date(now.getFullYear(), now.getMonth(), p.dueDay) : null;
+          if (due && due < now) due = new Date(now.getFullYear(), now.getMonth()+1, p.dueDay);
+          const daysLeft = due ? Math.floor((due - now)/(1000*60*60*24)) : null;
+          // Calculate days since due date passed (for overdue)
+          let lastDue = p.dueDay ? new Date(now.getFullYear(), now.getMonth(), p.dueDay) : null;
+          if (lastDue && lastDue > now) lastDue = new Date(now.getFullYear(), now.getMonth()-1, p.dueDay);
+          const daysOver = lastDue ? Math.floor((now - lastDue)/(1000*60*60*24)) : null;
+          let label='—', color='var(--text-muted)';
+          if (p.type==='scholar') { label='Scholar'; color='#2563eb'; }
+          else if (st==='overdue') {
+            label = daysOver!==null ? daysOver+' days overdue' : 'Overdue';
+            color = 'var(--overdue)';
+          } else if (st==='payment_day') {
+            label = 'Due today'; color = 'var(--payment-day)';
+          } else if (st==='upcoming') {
+            label = daysLeft!==null ? daysLeft+' days left' : 'Upcoming';
+            color = 'var(--upcoming)';
+          } else if (st==='paid') {
+            label = daysLeft!==null ? daysLeft+' days left' : 'Paid';
+            color = 'var(--paid)';
+          }
+          return `<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:8px;gap:6px">
+            <span style="font-weight:500;color:${color}">⏱ ${label}</span>
+            <span style="color:var(--branch-cmc1)">${tdays.length?'🏃 '+tdays.join('·'):''}</span>
+          </div>`;
+        })()}
         <div style="display:flex;gap:5px" onclick="event.stopPropagation()">
           ${p.type!=='scholar'&&status!=='paid'?`<button style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:7px;padding:6px;font-size:11px;cursor:pointer;color:var(--paid);font-weight:500" onclick="openPaymentConfirm('${p.id}')">💳 Pay</button>`:'<div style="flex:1"></div>'}
           ${canEdit?`<button style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:12px;cursor:pointer" onclick="editPlayer('${p.id}')">✏️</button>`:''}
