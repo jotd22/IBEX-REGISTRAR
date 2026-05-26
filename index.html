@@ -422,6 +422,10 @@ tr:hover td{background:var(--surface2)}
         <span class="nav-icon">⚙️</span>
         <span>Settings</span>
       </div>
+      <div class="nav-item admin-only" onclick="showPanel('activity')" id="nav-activity">
+        <span class="nav-icon">📜</span>
+        <span>Activity Log</span>
+      </div>
     </div>
     <div class="sidebar-footer">
       <div class="user-pill" onclick="handleLogout()">
@@ -588,19 +592,23 @@ tr:hover td{background:var(--surface2)}
 
       <!-- =================== ATTENDANCE =================== -->
       <div class="panel" id="panel-attendance">
-        <div class="flex-between mb-2">
+        <div class="flex-between mb-2" style="flex-wrap:wrap;gap:10px">
           <div>
             <div class="card-title">Mark Attendance</div>
             <div class="card-subtitle">Session date:
-              <input type="date" id="att-date" class="form-input" style="display:inline-block;width:auto;padding:4px 10px;font-size:13px" />
+              <input type="date" id="att-date" class="form-input" style="display:inline-block;width:auto;padding:4px 10px;font-size:13px" onchange="loadAttendancePlayers()"/>
             </div>
           </div>
-          <div class="flex" style="gap:8px">
+          <div class="flex" style="gap:8px;flex-wrap:wrap">
             <select class="form-input" id="att-branch-filter" onchange="loadAttendancePlayers()" style="width:auto;padding:8px 14px">
               <option value="">All Branches</option>
             </select>
-            <button class="btn btn-primary btn-sm" onclick="saveAllAttendance()">💾 Save Attendance</button>
+            <button class="btn btn-primary btn-sm" onclick="saveAllAttendance()">💾 Save</button>
           </div>
+        </div>
+        <div class="search-bar mb-2" style="max-width:340px">
+          <span class="search-icon">🔍</span>
+          <input type="text" placeholder="Search player name..." id="att-search" oninput="filterAttendancePlayers()"/>
         </div>
 
         <div class="flex mb-2" style="gap:12px">
@@ -775,6 +783,43 @@ tr:hover td{background:var(--surface2)}
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- =================== ACTIVITY LOG =================== -->
+      <div class="panel admin-only" id="panel-activity">
+        <div class="flex-between mb-2" style="flex-wrap:wrap;gap:10px">
+          <div>
+            <div class="card-title">📜 Activity Log</div>
+            <div class="card-subtitle">All actions by all staff</div>
+          </div>
+          <div class="flex" style="gap:8px">
+            <select class="form-input" id="activity-type-filter" onchange="loadActivityLog()" style="padding:8px 14px;width:auto">
+              <option value="">All Types</option>
+              <option value="player">Players</option>
+              <option value="payment">Payments</option>
+              <option value="attendance">Attendance</option>
+              <option value="account">Accounts</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="loadActivityLog()">🔄 Refresh</button>
+          </div>
+        </div>
+        <div class="search-bar mb-2" style="max-width:340px">
+          <span class="search-icon">🔍</span>
+          <input type="text" placeholder="Search activity..." id="activity-search" oninput="loadActivityLog()"/>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Time</th><th>Type</th><th>Action</th><th>By</th></tr></thead>
+              <tbody id="activity-log-body">
+                <tr><td colspan="4" style="text-align:center;padding:40px;color:var(--text-muted)">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:14px">
+          <button class="btn btn-secondary btn-sm" id="load-more-activity" onclick="loadMoreActivity()" style="display:none">Load More</button>
         </div>
       </div>
 
@@ -1125,6 +1170,10 @@ tr:hover td{background:var(--surface2)}
       <div style="font-size:22px;margin-bottom:4px">⚙️</div>
       <div style="font-size:12px;font-weight:500;color:var(--text-primary)">Settings</div>
     </div>
+    <div onclick="showPanel('activity');closeMobileMenu()" class="admin-only" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 10px;text-align:center;cursor:pointer">
+      <div style="font-size:22px;margin-bottom:4px">📜</div>
+      <div style="font-size:12px;font-weight:500;color:var(--text-primary)">Activity</div>
+    </div>
     <div onclick="handleLogout();closeMobileMenu()" style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:14px 10px;text-align:center;cursor:pointer">
       <div style="font-size:22px;margin-bottom:4px">🚪</div>
       <div style="font-size:12px;font-weight:500;color:var(--overdue)">Sign Out</div>
@@ -1205,13 +1254,13 @@ tr:hover td{background:var(--surface2)}
 //  https://console.firebase.google.com → Project Settings → Your apps
 // ============================================================
 const FIREBASE_CONFIG = {
- apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
+  apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
 authDomain: "ibex-academy-registrar.firebaseapp.com",
 projectId: "ibex-academy-registrar",
 storageBucket: "ibex-academy-registrar.firebasestorage.app",
 messagingSenderId: "260284443908",
 appId: "1:260284443908:web:29fdc60ede231f368f7451"
-  };
+};
 
 // Initialize Firebase
 firebase.initializeApp(FIREBASE_CONFIG);
@@ -1277,7 +1326,8 @@ function showPanel(name) {
     branches: ['Branches','Manage academy branches'],
     reports: ['Reports','Generate and export PDF reports'],
     accounts: ['Accounts','Registrar account management'],
-    settings: ['Settings','Academy configuration']
+    settings: ['Settings','Academy configuration'],
+    activity: ['Activity Log','All staff actions and changes']
   };
   if (titles[name]) {
     document.getElementById('topbar-title').textContent = titles[name][0];
@@ -1288,6 +1338,7 @@ function showPanel(name) {
   if (name === 'attendance') initAttendance();
   if (name === 'branches') renderBranchesPanel();
   if (name === 'accounts') loadRegistrars();
+  if (name === 'activity') loadActivityLog();
   if (name === 'settings') renderBranchSettings();
   if (name === 'reports') populateReportBranches();
 }
@@ -1358,19 +1409,26 @@ function normalizePlayer(p) {
   if (p.fee) p.fee = Number(p.fee);
   // regDate: old uses regdate, new uses regDate
   if (!p.regDate && p.regdate) p.regDate = p.regdate;
-  // Due day: derive from registration date if not set
-  // e.g. registered 2026-05-08 → dueDay = 8 (8th of every month)
-  if (!p.dueDay && p.paymentDay) p.dueDay = Number(p.paymentDay);
-  if (!p.dueDay && p.dueDate) {
+  // Due day priority: explicit dueDay > paymentDay > dueDate > regDate
+  // Always recalculate so changing regDate updates the due day
+  if (p.paymentDay) p.dueDay = Number(p.paymentDay);
+  else if (p.dueDay) p.dueDay = Number(p.dueDay);
+  else if (p.dueDate) {
     const d = new Date(p.dueDate);
     if (!isNaN(d)) p.dueDay = d.getDate();
   }
+  // Always fall back to regDate — this ensures changing regDate updates dueDay
   if (!p.dueDay && p.regDate) {
     const d = new Date(p.regDate);
     if (!isNaN(d)) p.dueDay = d.getDate();
   }
-  // Cap dueDay at 28 to avoid month-end issues
-  if (p.dueDay) p.dueDay = Math.min(Number(p.dueDay), 30);
+  // If dueDay is 0 or missing, derive from regDate regardless
+  if (!p.dueDay) {
+    const src = p.regDate || p.regdate;
+    if (src) { const d = new Date(src); if (!isNaN(d)) p.dueDay = d.getDate(); }
+  }
+  // Cap dueDay at 28 to avoid Feb issues
+  if (p.dueDay) p.dueDay = Math.min(Number(p.dueDay), 28);
   // Status override: if old data has status field = 'paid', honour it
   if (!p.paidUntil && p.status === 'paid') {
     const now = today();
@@ -2175,8 +2233,20 @@ async function loadAttendancePlayers() {
     if (sessDoc.exists) attendanceState = sessDoc.data().records || {};
   } catch(e) {}
 
+  _currentAttPlayers = players;
   renderAttendanceTable(players);
   updateAttendanceCounts(players);
+}
+
+// Store current attendance players for search filtering
+let _currentAttPlayers = [];
+
+function filterAttendancePlayers() {
+  const q = (document.getElementById('att-search')?.value || '').toLowerCase().trim();
+  if (!q) { renderAttendanceTable(_currentAttPlayers); return; }
+  const filtered = _currentAttPlayers.filter(p => (p.name||'').toLowerCase().includes(q));
+  renderAttendanceTable(filtered);
+  updateAttendanceCounts(_currentAttPlayers); // counts stay based on ALL players
 }
 
 function renderAttendanceTable(players) {
@@ -2214,13 +2284,7 @@ function markAttendance(playerId, status, btnEl) {
     row.querySelectorAll('.att-btn').forEach(b => b.classList.remove('present-active','absent-active','excused-active'));
     btnEl.classList.add(`${status}-active`);
   }
-  const branch = document.getElementById('att-branch-filter').value;
-  let players = [...allPlayers];
-  if (branch) players = players.filter(p => p.branch === branch);
-  if (currentUserRole === 'registrar' && currentUserBranch) {
-    players = players.filter(p => p.branch === currentUserBranch);
-  }
-  updateAttendanceCounts(players);
+  updateAttendanceCounts(_currentAttPlayers);
 }
 
 function updateAttendanceCounts(players) {
@@ -2497,6 +2561,46 @@ async function loadRecentActivity() {
       </div>`).join('') || '<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px">No recent activity</div>';
   } catch(e) {}
 }
+
+let _activityLastDoc = null;
+async function loadActivityLog(loadMore=false) {
+  const typeFilter = document.getElementById('activity-type-filter')?.value || '';
+  const searchQ = (document.getElementById('activity-search')?.value || '').toLowerCase();
+  const tbody = document.getElementById('activity-log-body');
+  if (!loadMore) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr>'; _activityLastDoc=null; }
+  try {
+    let q = db.collection('activity').orderBy('timestamp','desc');
+    if (typeFilter) q = q.where('type','==',typeFilter);
+    if (_activityLastDoc && loadMore) q = q.startAfter(_activityLastDoc);
+    q = q.limit(30);
+    const snap = await q.get();
+    _activityLastDoc = snap.docs[snap.docs.length-1] || null;
+    document.getElementById('load-more-activity').style.display = snap.docs.length===30 ? '' : 'none';
+    let items = snap.docs.map(d => ({id:d.id,...d.data()}));
+    if (searchQ) items = items.filter(i => (i.message||'').toLowerCase().includes(searchQ));
+    const icons = {player:'👟',payment:'💳',attendance:'📋',account:'👥',general:'🔔'};
+    const typeColors = {player:'var(--branch-cmc2)',payment:'var(--paid)',attendance:'var(--branch-cmc1)',account:'var(--branch-tafo)',general:'var(--text-muted)'};
+    const typeBg = {player:'#f0fdf4',payment:'#f0fdf4',attendance:'#eff6ff',account:'#faf5ff',general:'var(--surface2)'};
+    const rows = items.map(item => {
+      const ts = item.timestamp ? (item.timestamp.toDate ? item.timestamp.toDate() : new Date(item.timestamp)) : null;
+      const timeStr = ts ? ts.toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+      const color = typeColors[item.type]||'var(--text-muted)';
+      const bg = typeBg[item.type]||'var(--surface2)';
+      return `<tr>
+        <td style="font-size:11px;color:var(--text-muted);white-space:nowrap">${timeStr}</td>
+        <td><span style="font-size:11px;font-weight:500;background:${bg};color:${color};padding:2px 8px;border-radius:20px">${icons[item.type]||'🔔'} ${item.type||'general'}</span></td>
+        <td style="font-size:13px">${item.message||'—'}</td>
+        <td style="font-size:11px;color:var(--text-muted)">${item.userId ? item.userId.slice(0,8)+'...' : '—'}</td>
+      </tr>`;
+    }).join('');
+    if (!loadMore) tbody.innerHTML = rows || '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-muted)">No activity found</td></tr>';
+    else tbody.innerHTML += rows;
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-muted)">Could not load activity log</td></tr>';
+  }
+}
+
+function loadMoreActivity() { loadActivityLog(true); }
 
 // =====================================================================
 //  REPORTS
