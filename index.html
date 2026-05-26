@@ -1054,7 +1054,7 @@ select.form-input option{background:var(--surface2)}
 //  https://console.firebase.google.com → Project Settings → Your apps
 // ============================================================
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
+    apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
   authDomain: "ibex-academy-registrar.firebaseapp.com",
   projectId: "ibex-academy-registrar",
   storageBucket: "ibex-academy-registrar.firebasestorage.app",
@@ -1171,6 +1171,51 @@ function formatDateSimple(d) {
 }
 
 function today() { return new Date(); }
+
+// =====================================================================
+//  OLD DATA COMPATIBILITY LAYER
+//  Maps old field names (fname/lname, isFree, parentPhone, etc.)
+//  to new field names (name, type, phone) — no Firebase data is changed
+// =====================================================================
+function normalizePlayer(p) {
+  // Full name: old data uses fname + lname, new uses name
+  if (!p.name && (p.fname || p.lname)) {
+    p.name = ((p.fname||'') + ' ' + (p.lname||'')).trim();
+  }
+  // Phone: old uses parentPhone OR phone
+  if (!p.phone && p.parentPhone) p.phone = p.parentPhone;
+  // Type: old uses isFree boolean, new uses type string
+  if (!p.type) {
+    p.type = (p.isFree === true || p.isFree === 'true') ? 'scholar' : 'paying';
+  }
+  // Branch: old uses full names like "Pepsi Branch", new uses IDs like "pepsi"
+  if (p.branch) {
+    const branchMap = {
+      'pepsi branch':'pepsi','pepsi':'pepsi',
+      'cmc 1':'cmc1','cmc1':'cmc1','cmc branch 1':'cmc1',
+      'cmc 2':'cmc2','cmc2':'cmc2','cmc branch 2':'cmc2',
+      'tafo':'tafo','tafo branch':'tafo'
+    };
+    const mapped = branchMap[p.branch.toLowerCase().trim()];
+    if (mapped) p.branch = mapped;
+  }
+  // Fee: old uses fee (number), new uses fee — same, just ensure number
+  if (p.fee) p.fee = Number(p.fee);
+  // Due day: old may use dueDate string or paymentDay, new uses dueDay number
+  if (!p.dueDay && p.paymentDay) p.dueDay = Number(p.paymentDay);
+  if (!p.dueDay && p.dueDate) {
+    const d = new Date(p.dueDate);
+    if (!isNaN(d)) p.dueDay = d.getDate();
+  }
+  // Status override: if old data has status field, map it
+  if (!p.paidUntil && p.status === 'paid') {
+    const now = today();
+    p.paidUntil = { toDate: () => new Date(now.getFullYear(), now.getMonth()+1, p.dueDay||1) };
+  }
+  // regDate: old uses regdate, new uses regDate
+  if (!p.regDate && p.regdate) p.regDate = p.regdate;
+  return p;
+}
 
 // =====================================================================
 //  PAYMENT STATUS LOGIC
@@ -1291,7 +1336,7 @@ async function initApp(userData) {
     query = query.where('branch', '==', currentUserBranch);
   }
   query.onSnapshot(snap => {
-    allPlayers = snap.docs.map(d => ({id:d.id,...d.data()}));
+    allPlayers = snap.docs.map(d => normalizePlayer({id:d.id,...d.data()}));
     renderDashboard();
     const activePanel = document.querySelector('.panel.active');
     if (activePanel && activePanel.id === 'panel-players') renderPlayersTable();
@@ -1416,7 +1461,7 @@ async function loadPlayers() {
       query = query.where('branch', '==', currentUserBranch);
     }
     const snap = await query.get();
-    allPlayers = snap.docs.map(d => ({id:d.id,...d.data()}));
+    allPlayers = snap.docs.map(d => normalizePlayer({id:d.id,...d.data()}));
   } catch(e) { allPlayers = []; }
 }
 
@@ -1553,13 +1598,13 @@ async function editPlayer(playerId) {
   if (!p) return;
   document.getElementById('player-modal-title').textContent = 'Edit Player';
   document.getElementById('edit-player-id').value = p.id;
-  document.getElementById('p-name').value = p.name || '';
-  document.getElementById('p-phone').value = p.phone || '';
+  document.getElementById('p-name').value = p.name || ((p.fname||'')+' '+(p.lname||'')).trim() || '';
+  document.getElementById('p-phone').value = p.phone || p.parentPhone || '';
   document.getElementById('p-branch').value = p.branch || '';
-  document.getElementById('p-type').value = p.type || 'paying';
+  document.getElementById('p-type').value = p.type || (p.isFree?'scholar':'paying');
   document.getElementById('p-fee').value = p.fee || '';
-  document.getElementById('p-due-day').value = p.dueDay || 1;
-  document.getElementById('p-reg-date').value = p.regDate || '';
+  document.getElementById('p-due-day').value = p.dueDay || p.paymentDay || 1;
+  document.getElementById('p-reg-date').value = p.regDate || p.regdate || '';
   document.getElementById('p-photo').value = p.photo || '';
   document.getElementById('p-notes').value = p.notes || '';
   toggleScholarFields();
