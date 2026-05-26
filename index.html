@@ -450,12 +450,12 @@ tr:hover td{background:var(--surface2)}
           <button class="btn btn-secondary btn-sm" onclick="toggleNotifications()" id="notif-btn" style="position:relative;padding:8px 12px">
             🔔 <span id="notif-count" style="display:none;position:absolute;top:-4px;right:-4px;background:var(--red);color:white;font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1" id="notif-count">0</span>
           </button>
-          <div id="notif-dropdown" style="display:none;position:absolute;top:44px;right:0;width:340px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 8px 32px rgba(0,0,0,0.5);z-index:999;max-height:420px;overflow-y:auto">
-            <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center">
-              <span>🔔 Notifications</span>
-              <button onclick="toggleNotifications()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px">✕</button>
+          <div id="notif-dropdown" style="display:none">
+            <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:center;background:var(--surface);position:sticky;top:0;z-index:1">
+              <span>🔔 Alerts</span>
+              <button onclick="toggleNotifications()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text-secondary);width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center">✕</button>
             </div>
-            <div id="notif-list" style="padding:8px"></div>
+            <div id="notif-list"></div>
           </div>
         </div>
         <button class="btn btn-primary btn-sm" id="quick-add-btn" onclick="openAddPlayerModal()">+ Add Player</button>
@@ -563,45 +563,26 @@ tr:hover td{background:var(--surface2)}
 
       <!-- =================== PLAYERS =================== -->
       <div class="panel" id="panel-players">
-        <div class="flex-between mb-2">
-          <div class="search-bar" style="flex:1;max-width:400px">
+        <div class="flex-between mb-2" style="gap:10px">
+          <div class="search-bar" style="flex:1">
             <span class="search-icon">🔍</span>
             <input type="text" placeholder="Search players..." id="player-search" oninput="filterPlayers()"/>
           </div>
-          <div class="flex" style="gap:8px">
-            <button class="btn btn-primary btn-sm" onclick="openAddPlayerModal()">+ Add Player</button>
-          </div>
+          <button class="btn btn-primary btn-sm" onclick="openAddPlayerModal()">+ Add</button>
         </div>
         <div class="filter-bar">
-          <span class="filter-chip active" onclick="filterPlayers('all',this)">All Players</span>
+          <span class="filter-chip active" onclick="filterPlayers('all',this)">All</span>
           <span class="filter-chip" onclick="filterPlayers('paying',this)">Paying</span>
           <span class="filter-chip" onclick="filterPlayers('scholar',this)">Scholars</span>
           <span class="filter-chip" id="filter-cmc1" onclick="filterPlayers('cmc1',this)">CMC 1</span>
           <span class="filter-chip" id="filter-cmc2" onclick="filterPlayers('cmc2',this)">CMC 2</span>
           <span class="filter-chip" id="filter-pepsi" onclick="filterPlayers('pepsi',this)">Pepsi</span>
           <span class="filter-chip" id="filter-tafo" onclick="filterPlayers('tafo',this)">Tafo</span>
-          <span class="filter-chip" onclick="filterPlayers('overdue',this)" style="color:var(--overdue)">Overdue</span>
-          <span class="filter-chip" onclick="filterPlayers('paid',this)" style="color:var(--paid)">Paid</span>
+          <span class="filter-chip" onclick="filterPlayers('overdue',this)">⚠️ Overdue</span>
+          <span class="filter-chip" onclick="filterPlayers('paid',this)">✅ Paid</span>
         </div>
-        <div class="card" style="padding:0;overflow:hidden">
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Player</th>
-                  <th>Branch</th>
-                  <th>Type</th>
-                  <th>Payment Status</th>
-                  <th>Due Date</th>
-                  <th>Monthly Fee</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="players-table-body">
-                <tr><td colspan="7" class="text-center" style="padding:40px;color:var(--text-muted)">Loading players...</td></tr>
-              </tbody>
-            </table>
-          </div>
+        <div id="players-card-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">
+          <div style="text-align:center;padding:40px;color:var(--text-muted);grid-column:1/-1">Loading players...</div>
         </div>
       </div>
 
@@ -866,6 +847,16 @@ tr:hover td{background:var(--surface2)}
           <input class="form-input" type="text" id="p-name" placeholder="e.g. Abebe Girma"/>
         </div>
         <div class="form-group">
+          <label class="form-label">Age</label>
+          <input class="form-input" type="number" id="p-age" placeholder="e.g. 14" min="4" max="40"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Parent Name</label>
+          <input class="form-input" type="text" id="p-parent" placeholder="e.g. Girma Tadesse"/>
+        </div>
+        <div class="form-group">
           <label class="form-label">Parent Phone *</label>
           <input class="form-input" type="tel" id="p-phone" placeholder="+251 91 234 5678"/>
         </div>
@@ -878,11 +869,21 @@ tr:hover td{background:var(--surface2)}
           </select>
         </div>
         <div class="form-group">
+          <label class="form-label">Jersey Number</label>
+          <input class="form-input" type="number" id="p-jersey" placeholder="e.g. 10" min="1" max="99"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
           <label class="form-label">Player Type *</label>
           <select class="form-input" id="p-type" onchange="toggleScholarFields()">
             <option value="paying">Monthly Paying</option>
             <option value="scholar">Scholar / Free Player</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Registration Date</label>
+          <input class="form-input" type="date" id="p-reg-date"/>
         </div>
       </div>
       <div id="paying-fields">
@@ -892,23 +893,27 @@ tr:hover td{background:var(--surface2)}
             <input class="form-input" type="number" id="p-fee" placeholder="500"/>
           </div>
           <div class="form-group">
-            <label class="form-label">Payment Due Day (of month) *</label>
-            <input class="form-input" type="number" id="p-due-day" min="1" max="30" placeholder="1"/>
-            <div class="form-hint">Day 1-30 each month</div>
+            <label class="form-label">Payment Due Day (of month)</label>
+            <input class="form-input" type="number" id="p-due-day" min="1" max="30" placeholder="auto from reg. date"/>
+            <div class="form-hint">Leave blank to use registration day</div>
           </div>
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Registration Date</label>
-        <input class="form-input" type="date" id="p-reg-date"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Photo URL (optional)</label>
-        <input class="form-input" type="url" id="p-photo" placeholder="https://..."/>
+        <label class="form-label">Player Photo</label>
+        <div id="player-photo-upload-area" onclick="document.getElementById('p-photo-file').click()" style="border:2px dashed var(--border);border-radius:var(--radius);padding:16px;text-align:center;cursor:pointer;background:var(--surface2)">
+          <div id="player-photo-preview-wrap">
+            <div style="font-size:24px;margin-bottom:4px">📷</div>
+            <div style="font-size:12px;color:var(--text-muted)">Click to upload player photo</div>
+          </div>
+          <img id="player-photo-preview-img" src="" style="display:none;width:80px;height:80px;object-fit:cover;border-radius:50%;margin:0 auto"/>
+        </div>
+        <input type="file" id="p-photo-file" accept="image/*" style="display:none" onchange="previewPlayerPhoto(this)"/>
+        <input type="hidden" id="p-photo"/>
       </div>
       <div class="form-group">
         <label class="form-label">Notes</label>
-        <textarea class="form-input" id="p-notes" rows="3" placeholder="Any additional notes..."></textarea>
+        <textarea class="form-input" id="p-notes" rows="2" placeholder="Any additional notes..."></textarea>
       </div>
     </div>
     <div class="modal-footer">
@@ -1090,7 +1095,7 @@ tr:hover td{background:var(--surface2)}
 //  https://console.firebase.google.com → Project Settings → Your apps
 // ============================================================
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
+   apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
 authDomain: "ibex-academy-registrar.firebaseapp.com",
 projectId: "ibex-academy-registrar",
 storageBucket: "ibex-academy-registrar.firebasestorage.app",
@@ -1559,13 +1564,19 @@ function openAddPlayerModal() {
   document.getElementById('player-modal-title').textContent = 'Add Player';
   document.getElementById('edit-player-id').value = '';
   document.getElementById('p-name').value='';
+  document.getElementById('p-age').value='';
+  document.getElementById('p-parent').value='';
   document.getElementById('p-phone').value='';
   document.getElementById('p-branch').value='';
+  document.getElementById('p-jersey').value='';
   document.getElementById('p-type').value='paying';
   document.getElementById('p-fee').value='';
-  document.getElementById('p-due-day').value='1';
+  document.getElementById('p-due-day').value='';
   document.getElementById('p-reg-date').value = formatDateSimple(today());
   document.getElementById('p-photo').value='';
+  document.getElementById('p-photo-file').value='';
+  document.getElementById('player-photo-preview-img').style.display='none';
+  document.getElementById('player-photo-preview-wrap').style.display='';
   document.getElementById('p-notes').value='';
   toggleScholarFields();
   openModal('player-modal');
@@ -1591,12 +1602,20 @@ async function savePlayer() {
   if (!name || !phone || !branch) { toast('Name, phone, and branch required','error'); return; }
   if (type === 'paying' && !fee) { toast('Monthly fee required for paying players','error'); return; }
 
+  const age = parseInt(document.getElementById('p-age').value) || null;
+  const parentName = document.getElementById('p-parent').value.trim();
+  const jersey = parseInt(document.getElementById('p-jersey').value) || null;
+  const photoData = document.getElementById('p-photo').value || null;
+
   const data = {
     name, phone, branch, type,
+    age: age || null,
+    parentName: parentName || null,
+    jersey: jersey || null,
     fee: type === 'paying' ? fee : 0,
-    dueDay: type === 'paying' ? dueDay : null,
+    dueDay: type === 'paying' ? (dueDay||null) : null,
     regDate: regDate || formatDateSimple(today()),
-    photo: photo || null,
+    photo: photoData || null,
     notes: notes || null,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   };
@@ -1616,61 +1635,77 @@ async function savePlayer() {
   } catch(e) { toast('Error: '+e.message,'error'); }
 }
 
-function renderPlayersTable(forceFilter) {
+function renderPlayersTable(forceFilter) { renderPlayersCards(forceFilter); }
+function renderPlayersCards(forceFilter) {
   const filter = forceFilter || currentPlayerFilter;
   const search = document.getElementById('player-search').value.toLowerCase();
   let players = [...allPlayers];
 
-  if (search) {
-    players = players.filter(p => p.name.toLowerCase().includes(search) || getBranchName(p.branch).toLowerCase().includes(search));
-  }
-
+  if (search) players = players.filter(p => (p.name||'').toLowerCase().includes(search) || getBranchName(p.branch).toLowerCase().includes(search));
   if (filter && filter !== 'all') {
-    if (['cmc1','cmc2','pepsi','tafo'].includes(filter) || allBranches.find(b=>b.id===filter)) {
-      players = players.filter(p => p.branch === filter);
-    } else if (filter === 'paying') {
-      players = players.filter(p => p.type !== 'scholar');
-    } else if (filter === 'scholar') {
-      players = players.filter(p => p.type === 'scholar');
-    } else if (['paid','upcoming','overdue','payment_day'].includes(filter)) {
-      players = players.filter(p => getPaymentStatus(p) === filter);
-    }
+    if (allBranches.find(b=>b.id===filter)) players = players.filter(p => p.branch === filter);
+    else if (filter === 'paying') players = players.filter(p => p.type !== 'scholar');
+    else if (filter === 'scholar') players = players.filter(p => p.type === 'scholar');
+    else if (['paid','upcoming','overdue','payment_day'].includes(filter)) players = players.filter(p => getPaymentStatus(p) === filter);
   }
 
-  const tbody = document.getElementById('players-table-body');
+  const grid = document.getElementById('players-card-grid');
+  if (!grid) return;
   if (!players.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)">No players found</td></tr>';
+    grid.innerHTML = '<div style="text-align:center;padding:48px;color:var(--text-muted);grid-column:1/-1"><div style="font-size:40px;margin-bottom:10px">👟</div><p>No players found</p></div>';
     return;
   }
 
   const canEdit = currentUserRole === 'admin' || currentUserRole === 'registrar';
-  tbody.innerHTML = players.map(p => {
+  grid.innerHTML = players.map(p => {
     const status = getPaymentStatus(p);
     const color = getBranchColor(p.branch);
-    const dueDate = getDueDate(p);
-    return `<tr onclick="showPlayerDetail('${p.id}')" style="cursor:pointer">
-      <td>
-        <div class="flex" style="gap:10px">
-          <div class="avatar avatar-sm" style="background:${color}">${getInitials(p.name)}</div>
-          <div>
-            <div style="font-weight:500;font-size:13px">${p.name}</div>
-            <div style="font-size:11px;color:var(--text-muted)">${p.phone}</div>
+    const statusColors = {paid:'var(--paid)',upcoming:'var(--upcoming)',overdue:'var(--overdue)',payment_day:'var(--payment-day)',scholar:'var(--scholar)'};
+    const sc = statusColors[status] || 'var(--text-muted)';
+    const photoHtml = p.photo
+      ? `<img src="${p.photo}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid ${color}" onerror="this.style.display='none'"/>`
+      : `<div style="width:48px;height:48px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:#fff;flex-shrink:0">${getInitials(p.name)}</div>`;
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);transition:all 0.15s" onmouseover="this.style.boxShadow='var(--shadow)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,0.04)';this.style.transform=''">
+      <div style="height:4px;background:${color}"></div>
+      <div style="padding:14px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;cursor:pointer" onclick="showPlayerDetail('${p.id}')">
+          ${photoHtml}
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:14px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:1px">${p.age?`Age ${p.age} · `:''}${p.jersey?`#${p.jersey} · `:''}${p.phone||''}</div>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:${color};font-family:var(--font-mono)">${p.jersey?`#${p.jersey}`:''}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;cursor:pointer" onclick="showPlayerDetail('${p.id}')">
+          <div style="background:var(--surface2);border-radius:8px;padding:8px 10px">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Branch</div>
+            <div style="font-size:12px;font-weight:500;color:${color}">${getBranchName(p.branch)}</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:8px;padding:8px 10px">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Type</div>
+            <div style="font-size:12px;font-weight:500;color:var(--text-primary)">${p.type==='scholar'?'🎓 Scholar':'💳 Paying'}</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:8px;padding:8px 10px">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Status</div>
+            <div style="font-size:12px;font-weight:600;color:${sc}">${statusBadge(status)}</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:8px;padding:8px 10px">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Monthly Fee</div>
+            <div style="font-size:12px;font-weight:600;color:var(--text-primary)">${p.type==='scholar'?'Free':`${(p.fee||0).toLocaleString()} ETB`}</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:8px;padding:8px 10px;grid-column:1/-1">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Due Date</div>
+            <div style="font-size:12px;font-weight:500;color:var(--text-primary)">${p.dueDay?`Day ${p.dueDay} of every month`:'—'}</div>
           </div>
         </div>
-      </td>
-      <td>${branchBadge(p.branch)}</td>
-      <td>${p.type==='scholar'?'<span class="badge badge-scholar">🎓 Scholar</span>':'<span class="badge" style="background:rgba(192,21,42,0.1);color:var(--red)">💳 Paying</span>'}</td>
-      <td>${statusBadge(status)}</td>
-      <td style="font-size:13px">${dueDate ? `Day ${p.dueDay} monthly` : '—'}</td>
-      <td style="font-size:13px;font-family:var(--font-mono)">${p.type==='scholar'?'Free':`${(p.fee||0).toLocaleString()} ETB`}</td>
-      <td onclick="event.stopPropagation()">
-        <div class="flex" style="gap:4px">
-          ${p.type!=='scholar'&&status!=='paid'?`<button class="btn btn-success btn-xs" onclick="openPaymentConfirm('${p.id}')">💳 Pay</button>`:''}
-          ${canEdit?`<button class="btn btn-secondary btn-xs" onclick="editPlayer('${p.id}')">✏️</button>`:''}
-          ${currentUserRole==='admin'?`<button class="btn btn-danger btn-xs" onclick="deletePlayer('${p.id}','${p.name}')">🗑️</button>`:''}
+        <div style="display:flex;gap:6px;border-top:1px solid var(--border-light);padding-top:10px">
+          <button style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px;font-size:12px;cursor:pointer;color:var(--text-secondary)" onclick="showPlayerDetail('${p.id}')">👤 Profile</button>
+          ${p.type!=='scholar'&&status!=='paid'?`<button style="flex:1;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:7px;font-size:12px;cursor:pointer;color:var(--paid);font-weight:500" onclick="openPaymentConfirm('${p.id}')">💳 Pay</button>`:''}
+          ${canEdit?`<button style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer;color:var(--text-secondary)" onclick="editPlayer('${p.id}')">✏️</button>`:''}
+          ${currentUserRole==='admin'?`<button style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:7px 10px;font-size:12px;cursor:pointer;color:var(--overdue)" onclick="deletePlayer('${p.id}','${p.name}')">🗑️</button>`:''}
         </div>
-      </td>
-    </tr>`;
+      </div>
+    </div>`;
   }).join('');
 }
 
@@ -1689,14 +1724,27 @@ async function editPlayer(playerId) {
   document.getElementById('player-modal-title').textContent = 'Edit Player';
   document.getElementById('edit-player-id').value = p.id;
   document.getElementById('p-name').value = p.name || ((p.fname||'')+' '+(p.lname||'')).trim() || '';
+  document.getElementById('p-age').value = p.age || '';
+  document.getElementById('p-parent').value = p.parentName || p.parent || '';
   document.getElementById('p-phone').value = p.phone || p.parentPhone || '';
   document.getElementById('p-branch').value = p.branch || '';
+  document.getElementById('p-jersey').value = p.jersey || '';
   document.getElementById('p-type').value = p.type || (p.isFree?'scholar':'paying');
   document.getElementById('p-fee').value = p.fee || '';
-  document.getElementById('p-due-day').value = p.dueDay || p.paymentDay || 1;
+  document.getElementById('p-due-day').value = p.dueDay || p.paymentDay || '';
   document.getElementById('p-reg-date').value = p.regDate || p.regdate || '';
   document.getElementById('p-photo').value = p.photo || '';
   document.getElementById('p-notes').value = p.notes || '';
+  // Show existing photo if any
+  const existingPhoto = p.photo || '';
+  if (existingPhoto) {
+    document.getElementById('player-photo-preview-img').src = existingPhoto;
+    document.getElementById('player-photo-preview-img').style.display = 'block';
+    document.getElementById('player-photo-preview-wrap').style.display = 'none';
+  } else {
+    document.getElementById('player-photo-preview-img').style.display = 'none';
+    document.getElementById('player-photo-preview-wrap').style.display = '';
+  }
   toggleScholarFields();
   openModal('player-modal');
 }
@@ -2471,6 +2519,22 @@ async function saveSettings() {
 // =====================================================================
 //  RECEIPT UPLOAD
 // =====================================================================
+function previewPlayerPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 3 * 1024 * 1024) { toast('Image too large — max 3MB','error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('player-photo-preview-img');
+    const wrap = document.getElementById('player-photo-preview-wrap');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    wrap.style.display = 'none';
+    document.getElementById('p-photo').value = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function previewReceipt(input) {
   const file = input.files[0];
   if (!file) return;
@@ -2492,14 +2556,22 @@ function previewReceipt(input) {
 let notifOpen = false;
 function toggleNotifications() {
   notifOpen = !notifOpen;
-  document.getElementById('notif-dropdown').style.display = notifOpen ? 'block' : 'none';
+  const dd = document.getElementById('notif-dropdown');
+  if (!dd) return;
+  dd.style.display = notifOpen ? 'block' : 'none';
+  // Update bottom nav active state
+  const bnNotif = document.getElementById('bn-notif');
+  if (bnNotif) bnNotif.classList.toggle('active', notifOpen);
   if (notifOpen) renderNotifications();
 }
 document.addEventListener('click', e => {
-  if (notifOpen && !e.target.closest('#notif-btn') && !e.target.closest('#notif-dropdown')) {
+  if (!notifOpen) return;
+  const dd = document.getElementById('notif-dropdown');
+  const btn = document.getElementById('notif-btn');
+  const bnNotif = document.getElementById('bn-notif');
+  if (dd && btn && !btn.contains(e.target) && !dd.contains(e.target) && !(bnNotif && bnNotif.contains(e.target))) {
     notifOpen = false;
-    const dd = document.getElementById('notif-dropdown');
-    if (dd) dd.style.display = 'none';
+    dd.style.display = 'none';
   }
 });
 function renderNotifications() {
