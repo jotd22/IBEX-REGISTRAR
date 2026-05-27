@@ -532,6 +532,18 @@ tr:hover td{background:var(--surface2)}
           </div>
         </div>
 
+        <div class="card mb-2">
+          <div class="card-header">
+            <div>
+              <div class="card-title">📈 Monthly Income</div>
+              <div class="card-subtitle">Last 6 months collected</div>
+            </div>
+            <div id="chart-total" style="font-family:var(--font-mono);font-size:13px;color:var(--paid);font-weight:600"></div>
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:6px;height:100px;padding:0 4px" id="income-chart-bars"></div>
+          <div style="display:flex;gap:6px;margin-top:8px;padding:0 4px" id="income-chart-labels"></div>
+        </div>
+
         <div class="overview-grid" style="grid-template-columns:1fr 1fr;margin-bottom:20px">
           <div class="card" style="border-left:3px solid var(--payment-day);border-radius:0 var(--radius-lg) var(--radius-lg) 0">
             <div class="card-header" style="margin-bottom:12px">
@@ -1254,7 +1266,7 @@ tr:hover td{background:var(--surface2)}
 //  https://console.firebase.google.com → Project Settings → Your apps
 // ============================================================
 const FIREBASE_CONFIG = {
-   apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
+  apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
 authDomain: "ibex-academy-registrar.firebaseapp.com",
 projectId: "ibex-academy-registrar",
 storageBucket: "ibex-academy-registrar.firebasestorage.app",
@@ -2383,6 +2395,58 @@ async function loadAttendanceHistory() {
 // =====================================================================
 //  DASHBOARD
 // =====================================================================
+async function renderIncomeChart() {
+  try {
+    const months = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleDateString('en-GB', {month:'short', year:'2-digit'});
+      const monthStr = d.toLocaleDateString('en-GB', {month:'long', year:'numeric'});
+      months.push({ label, monthStr, total: 0 });
+    }
+    // Query payments for last 6 months
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const snap = await db.collection('payments')
+      .where('paidDate', '>=', firebase.firestore.Timestamp.fromDate(sixMonthsAgo))
+      .get();
+    snap.docs.forEach(d => {
+      const data = d.data();
+      const paidDate = data.paidDate?.toDate ? data.paidDate.toDate() : new Date(data.paidDate);
+      const mStr = paidDate.toLocaleDateString('en-GB', {month:'long', year:'numeric'});
+      const m = months.find(x => x.monthStr === mStr);
+      if (m) m.total += (data.amount || 0);
+    });
+    const maxVal = Math.max(...months.map(m => m.total), 1);
+    const barsEl = document.getElementById('income-chart-bars');
+    const labelsEl = document.getElementById('income-chart-labels');
+    const totalThis = months[months.length-1].total;
+    const chartTotal = document.getElementById('chart-total');
+    if (chartTotal) chartTotal.textContent = totalThis.toLocaleString() + ' ETB this month';
+    if (barsEl) {
+      barsEl.innerHTML = months.map((m, i) => {
+        const pct = Math.max(4, Math.round((m.total / maxVal) * 100));
+        const isThis = i === months.length - 1;
+        const color = isThis ? 'var(--paid)' : 'var(--border)';
+        const textColor = isThis ? 'var(--paid)' : 'var(--text-muted)';
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+          <div style="font-size:9px;color:${textColor};font-family:var(--font-mono)">${m.total>0?m.total.toLocaleString():''}</div>
+          <div style="width:100%;background:${color};border-radius:4px 4px 0 0;height:${pct}px;transition:height 0.5s ease;opacity:${isThis?1:0.45}" title="${m.label}: ${m.total.toLocaleString()} ETB"></div>
+        </div>`;
+      }).join('');
+    }
+    if (labelsEl) {
+      labelsEl.innerHTML = months.map((m, i) => {
+        const isThis = i === months.length - 1;
+        return `<div style="flex:1;text-align:center;font-size:9px;color:${isThis?'var(--paid)':'var(--text-muted)'};font-weight:${isThis?'600':'400'}">${m.label}</div>`;
+      }).join('');
+    }
+  } catch(e) {
+    const el = document.getElementById('income-chart-bars');
+    if (el) el.innerHTML = '<div style="color:var(--text-muted);font-size:12px">Chart unavailable</div>';
+  }
+}
+
 function renderDashboard() {
   const total = allPlayers.length;
   const scholars = allPlayers.filter(p => p.type === 'scholar').length;
@@ -2486,6 +2550,8 @@ function renderDashboard() {
 
   // Update notification badge
   updateNotifBadge();
+  // Render income chart
+  renderIncomeChart();
 }
 
 // =====================================================================
@@ -2719,6 +2785,66 @@ async function generateReport() {
       const bp = players.filter(p => p.branch === b.id);
       lines.push(`${b.name}: ${bp.length} players`);
     });
+  } else if (type === 'attendance') {
+    // Load attendance records for the date range
+    lines.push('ATTENDANCE REPORT');
+    lines.push(`Players: ${players.length}`);
+    lines.push('');
+    try {
+      const attSnap = await db.collection('attendance').orderBy('date').get();
+      const sessions = attSnap.docs.map(d => d.data()).filter(s => {
+        if (from && s.date < from) return false;
+        if (to && s.date > to) return false;
+        if (branch && s.branch !== branch && s.branch !== 'all') return false;
+        return true;
+      });
+      if (!sessions.length) {
+        lines.push('No attendance sessions found for this period.');
+      } else {
+        lines.push(`Sessions found: ${sessions.length}`);
+        lines.push('');
+        // Per player summary
+        lines.push('PLAYER ATTENDANCE SUMMARY');
+        lines.push('-'.repeat(60));
+        players.forEach((p, i) => {
+          let present = 0, absent = 0, excused = 0;
+          sessions.forEach(s => {
+            if (!s.records) return;
+            const status = s.records[p.id];
+            if (status === 'present') present++;
+            else if (status === 'absent') absent++;
+            else if (status === 'excused') excused++;
+          });
+          const total = present + absent + excused;
+          const rate = total > 0 ? Math.round(present/total*100) : 0;
+          lines.push(`${String(i+1).padStart(3,'0')}. ${p.name}`);
+          lines.push(`     Branch: ${getBranchName(p.branch)}`);
+          lines.push(`     ✅ Present: ${present}  ❌ Absent: ${absent}  🟡 Excused: ${excused}  |  Rate: ${rate}%`);
+          lines.push('');
+        });
+        lines.push('-'.repeat(60));
+        // Per session summary
+        lines.push('');
+        lines.push('SESSION BY SESSION SUMMARY');
+        lines.push('-'.repeat(60));
+        sessions.forEach(s => {
+          lines.push(`Date: ${s.date} | Branch: ${s.branch}`);
+          lines.push(`  ✅ Present: ${s.counts?.present||0}  ❌ Absent: ${s.counts?.absent||0}  🟡 Excused: ${s.counts?.excused||0}`);
+          // List each player's status
+          if (s.records) {
+            Object.entries(s.records).forEach(([pid, st]) => {
+              const pl = players.find(x => x.id === pid);
+              const name = pl ? pl.name : pid;
+              const icon = st==='present'?'✅':st==='absent'?'❌':'🟡';
+              lines.push(`    ${icon} ${name}`);
+            });
+          }
+          lines.push('');
+        });
+      }
+    } catch(e) {
+      lines.push('Error loading attendance data: ' + e.message);
+    }
   } else {
     lines.push(`[${type.toUpperCase()} REPORT]`);
     lines.push(`Players in scope: ${players.length}`);
