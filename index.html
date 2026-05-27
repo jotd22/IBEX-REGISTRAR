@@ -259,7 +259,7 @@ tr:hover td{background:var(--surface2)}
 .overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
 
 /* NOTIFICATION DROPDOWN */
-#notif-dropdown{position:fixed;top:58px;right:0;width:100%;max-width:100%;background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);box-shadow:var(--shadow-lg);z-index:400;max-height:70vh;overflow-y:auto}
+#notif-dropdown{position:fixed;top:58px;right:0;left:0;background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);box-shadow:var(--shadow-lg);z-index:400;max-height:70vh;overflow-y:auto}
 
 /* PROGRESS */
 .progress-bar{background:var(--surface2);border-radius:4px;height:5px;overflow:hidden}
@@ -307,7 +307,7 @@ tr:hover td{background:var(--surface2)}
   .modal-lg{max-width:680px}
   @keyframes modalIn{from{transform:scale(0.96);opacity:0}to{transform:scale(1);opacity:1}}
   .modal-handle{display:none}
-  #notif-dropdown{position:absolute;top:58px;right:16px;width:340px;border-radius:var(--radius-lg);border:1px solid var(--border)}
+  #notif-dropdown{position:fixed;top:58px;right:16px;left:auto;width:360px;border-radius:var(--radius-lg);border:1px solid var(--border);box-shadow:var(--shadow-lg);max-height:70vh;overflow-y:auto}
   .bottom-nav{display:none!important}
   .player-profile{flex-direction:row}
 }
@@ -1266,7 +1266,7 @@ tr:hover td{background:var(--surface2)}
 //  https://console.firebase.google.com → Project Settings → Your apps
 // ============================================================
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
+    apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
 authDomain: "ibex-academy-registrar.firebaseapp.com",
 projectId: "ibex-academy-registrar",
 storageBucket: "ibex-academy-registrar.firebasestorage.app",
