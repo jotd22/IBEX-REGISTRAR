@@ -1266,7 +1266,7 @@ tr:hover td{background:var(--surface2)}
 //  https://console.firebase.google.com → Project Settings → Your apps
 // ============================================================
 const FIREBASE_CONFIG = {
- apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
+    apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
 authDomain: "ibex-academy-registrar.firebaseapp.com",
 projectId: "ibex-academy-registrar",
 storageBucket: "ibex-academy-registrar.firebasestorage.app",
@@ -1421,26 +1421,17 @@ function normalizePlayer(p) {
   if (p.fee) p.fee = Number(p.fee);
   // regDate: old uses regdate, new uses regDate
   if (!p.regDate && p.regdate) p.regDate = p.regdate;
-  // Due day priority: explicit dueDay > paymentDay > dueDate > regDate
-  // Always recalculate so changing regDate updates the due day
-  if (p.paymentDay) p.dueDay = Number(p.paymentDay);
-  else if (p.dueDay) p.dueDay = Number(p.dueDay);
-  else if (p.dueDate) {
-    const d = new Date(p.dueDate);
-    if (!isNaN(d)) p.dueDay = d.getDate();
+  // Due day: ALWAYS derived from regDate — this is the single source of truth
+  // Ignores old paymentDay/dueDay fields to ensure consistency across all devices
+  const regSrc = p.regDate || p.regdate;
+  if (regSrc) {
+    const d = new Date(regSrc);
+    if (!isNaN(d)) p.dueDay = Math.min(d.getDate(), 30);
+  } else if (p.dueDay) {
+    p.dueDay = Math.min(Number(p.dueDay), 30);
+  } else if (p.paymentDay) {
+    p.dueDay = Math.min(Number(p.paymentDay), 30);
   }
-  // Always fall back to regDate — this ensures changing regDate updates dueDay
-  if (!p.dueDay && p.regDate) {
-    const d = new Date(p.regDate);
-    if (!isNaN(d)) p.dueDay = d.getDate();
-  }
-  // If dueDay is 0 or missing, derive from regDate regardless
-  if (!p.dueDay) {
-    const src = p.regDate || p.regdate;
-    if (src) { const d = new Date(src); if (!isNaN(d)) p.dueDay = d.getDate(); }
-  }
-  // Cap dueDay at 30
-  if (p.dueDay) p.dueDay = Math.min(Number(p.dueDay), 30);
   // Status override: if old data has status field = 'paid', honour it
   if (!p.paidUntil && p.status === 'paid') {
     const now = today();
