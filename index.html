@@ -1266,7 +1266,7 @@ tr:hover td{background:var(--surface2)}
 //  https://console.firebase.google.com → Project Settings → Your apps
 // ============================================================
 const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
+ apiKey: "AIzaSyCQUi0C5cdchEOmDcTx9mTom0zQZxZKidE",
 authDomain: "ibex-academy-registrar.firebaseapp.com",
 projectId: "ibex-academy-registrar",
 storageBucket: "ibex-academy-registrar.firebasestorage.app",
@@ -1454,65 +1454,68 @@ function normalizePlayer(p) {
 // =====================================================================
 function getPaymentStatus(player) {
   if (player.type === 'scholar') return 'scholar';
-  // Manual override — admin/registrar can set this directly
-  // Auto system resets it when payment is confirmed
+
+  // Manual override — stays until admin/registrar changes it
+  // Only cleared automatically when payment is confirmed
   if (player.manualStatus && ['paid','upcoming','overdue'].includes(player.manualStatus)) {
     return player.manualStatus;
   }
+
   if (!player.dueDay) return 'upcoming';
 
   const now = today();
   now.setHours(0,0,0,0);
 
-  // Find the NEXT upcoming due date from today
-  let due = new Date(now.getFullYear(), now.getMonth(), player.dueDay);
-  // If this month's due date has already passed, move to next month
-  if (due < now) due = new Date(now.getFullYear(), now.getMonth()+1, player.dueDay);
+  // This month's due date
+  const thisDue = new Date(now.getFullYear(), now.getMonth(), player.dueDay);
+  thisDue.setHours(0,0,0,0);
 
-  // If player has a confirmed paidUntil date that covers the next due date → PAID
+  // Next month's due date
+  const nextDue = new Date(now.getFullYear(), now.getMonth()+1, player.dueDay);
+  nextDue.setHours(0,0,0,0);
+
+  // ── STEP 1: If paidUntil covers this month's due date → figure out where we are
   if (player.paidUntil) {
     const paidUntil = player.paidUntil.toDate ? player.paidUntil.toDate() : new Date(player.paidUntil);
     paidUntil.setHours(0,0,0,0);
-    if (paidUntil >= due) return 'paid';
+    // paidUntil is the NEXT due date after the last payment
+    const daysToNext = Math.floor((paidUntil - now) / (1000*60*60*24));
+    if (daysToNext > 5)  return 'paid';
+    if (daysToNext > 0)  return 'upcoming';
+    if (daysToNext === 0) return 'payment_day';
+    // daysToNext < 0 means paidUntil has passed → overdue
+    return 'overdue';
   }
 
-  // If player registered recently and next due hasn't come yet → treat as PAID
-  // (they just registered, their first payment isn't due yet)
+  // ── STEP 2: No paidUntil — check registration date to see if first payment is due
   const regDateStr = player.regDate || player.regdate;
   if (regDateStr) {
     const reg = new Date(regDateStr);
     reg.setHours(0,0,0,0);
-    // If registered after the last due date, they are paid until next due
-    const lastDue = new Date(now.getFullYear(), now.getMonth(), player.dueDay);
-    if (lastDue > now) {
-      // Due date is still in future this month
-      const prevDue = new Date(now.getFullYear(), now.getMonth()-1, player.dueDay);
-      if (reg >= prevDue) {
-        // Registered since last due date — they're paid for this cycle
-        const diffDays = Math.floor((due - now) / (1000*60*60*24));
-        if (diffDays > 5) return 'paid';
-        if (diffDays > 0) return 'upcoming';
-        if (diffDays === 0) return 'payment_day';
-      }
-    } else {
-      // Due date already passed this month — check if registered after it
-      if (reg >= lastDue) {
-        // Registered after this month's due date → paid until next month's due
-        const nextDue = new Date(now.getFullYear(), now.getMonth()+1, player.dueDay);
-        const diffDays = Math.floor((nextDue - now) / (1000*60*60*24));
-        if (diffDays > 5) return 'paid';
-        if (diffDays > 0) return 'upcoming';
-        if (diffDays === 0) return 'payment_day';
-      }
+
+    // Find the first due date ON OR AFTER registration
+    let firstDue = new Date(reg.getFullYear(), reg.getMonth(), player.dueDay);
+    if (firstDue < reg) {
+      // That day already passed in reg month — first due is next month
+      firstDue = new Date(reg.getFullYear(), reg.getMonth()+1, player.dueDay);
     }
+    firstDue.setHours(0,0,0,0);
+
+    const daysToFirst = Math.floor((firstDue - now) / (1000*60*60*24));
+    if (daysToFirst > 5)  return 'paid';      // First payment not due yet
+    if (daysToFirst > 0)  return 'upcoming';  // 1–5 days until first payment
+    if (daysToFirst === 0) return 'payment_day'; // First payment due today
+    // daysToFirst < 0 → first payment is overdue
+    return 'overdue';
   }
 
-  // Standard logic: how many days until next due date
-  const diffDays = Math.floor((due - now) / (1000*60*60*24));
-  if (diffDays === 0) return 'payment_day';
-  if (diffDays > 0 && diffDays <= 5) return 'upcoming';
-  if (diffDays > 5) return 'paid'; // future due date, no payment record = still paid
-  // due is in the past (overdue)
+  // ── STEP 3: No regDate either — use this month's due date
+  const daysToThis = Math.floor((thisDue - now) / (1000*60*60*24));
+  if (daysToThis > 5)  return 'paid';
+  if (daysToThis > 0)  return 'upcoming';
+  if (daysToThis === 0) return 'payment_day';
+  // Due date has passed this month → OVERDUE
+  return 'overdue';
   return 'overdue';
 }
 
